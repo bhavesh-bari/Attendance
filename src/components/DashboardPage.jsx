@@ -4,7 +4,7 @@ import SummaryCards from '@/components/UI/SummaryCards';
 import Leaderboard from '@/components/UI/Leaderboard';
 import { initialAttendanceData } from '@/data/attendanceData';
 import DashAttendanceBar from '@/components/UI/dashAttendanceBar';
-import DashEvents from '@/components/UI/DashEvents';
+import DashEvents from '@/components/UI/dashEvents';
 const DashboardPage = () => {
     return (
         <div className=" md:ml-16 space-y-10 bg-gray-50 min-h-screen">
@@ -19,7 +19,7 @@ const DashboardPage = () => {
                 <DashAttendanceBar />
             </div>
 
-                        <div className="bg-white p-1 rounded-xl shadow-lg">
+            <div className="bg-white p-1 rounded-xl shadow-lg">
                 <DashEvents />
             </div>
 
