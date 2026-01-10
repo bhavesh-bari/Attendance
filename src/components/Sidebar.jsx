@@ -1,40 +1,62 @@
-// Sidebar.js
-import Link from "next/link";
-import { Home, Settings, Users, BookOpen } from "lucide-react";
+import React from 'react';
+import { Home, Users, BookOpen, Table } from 'lucide-react';
+import { BarChart3 } from "lucide-react";
+
+const SIDEBAR_WIDTH_FULL = 'w-48';
+const SIDEBAR_WIDTH_COLLAPSED = 'w-18';
+const DURATION = 'duration-300';
 
 const navItems = [
-    { name: "Dashboard", href: "/", icon: Home },
-    { name: "Projects", href: "/projects", icon: BookOpen },
-    { name: "Team", href: "/team", icon: Users },
-    { name: "Settings", href: "/settings", icon: Settings },
+    { name: "Dashboard", href: "/dashboard", icon: Home },
+    { name: "Fill Forms", href: "/fill", icon: BookOpen },
+    { name: "Edit Data", href: "/edit", icon: Users },
+    { name: "Table", href: "/table", icon: Table },
+    { name: "Analytics", href: "/analytics", icon: BarChart3 },
 ];
+const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
+    const sidebarWidthClass = isSidebarOpen ? SIDEBAR_WIDTH_FULL : SIDEBAR_WIDTH_COLLAPSED;
 
-const Sidebar = ({ isOpen }) => {
     return (
-        <div
+        <aside
             className={`
-        fixed inset-y-0 left-0 z-30 w-64 bg-gray-900 text-white flex flex-col
-        transform transition-transform duration-300 ease-in-out
-        ${isOpen ? "translate-x-0" : "-translate-x-full"}
-        md:translate-x-0 md:h-screen
-      `}
+                fixed top-16 bottom-0 left-0 z-50 bg-gray-900 text-white flex flex-col shadow-2xl
+                transition-all ${DURATION} ease-in-out
+                ${sidebarWidthClass} 
+                
+                /* Mobile: Slides completely out/in below md breakpoint */
+                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
+                md:translate-x-0
+            `}
         >
-            <div className="p-4 text-2xl font-bold border-b border-gray-700">
-                Hod Panel
-            </div>
 
-            <nav className="flex flex-col p-2 space-y-2">
+
+            <nav className="flex flex-col p-2 space-y-2  flex-1">
                 {navItems.map((item) => (
-                    <Link key={item.name} href={item.href} legacyBehavior>
-                        <a className="flex items-center px-4 py-2 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white">
-                            <item.icon className="w-5 h-5 mr-3" />
+                    <a key={item.name} href={item.href} onClick={toggleSidebar}
+                        className="group flex items-center px-3 py-2 rounded-xl text-gray-300 hover:bg-gray-700 hover:text-white transition-colors relative"
+                    >
+                        <item.icon className={`w-6 h-6 flex-shrink-0 ${isSidebarOpen ? 'mr-3' : 'mr-0'}`} />
+
+                        <span
+                            className={`
+                                overflow-hidden whitespace-nowrap transition-all ${DURATION}
+                                ${isSidebarOpen ? 'w-auto opacity-100' : 'w-0 opacity-0 md:w-0 md:opacity-0'}
+                                flex-1
+                            `}
+                        >
                             {item.name}
-                        </a>
-                    </Link>
+                        </span>
+
+
+                        {!isSidebarOpen && (
+                            <div className="absolute left-full ml-4 p-2 bg-gray-800 text-sm text-white rounded-lg shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity hidden md:block z-50">
+                                {item.name}
+                            </div>
+                        )}
+                    </a>
                 ))}
             </nav>
-        </div>
+        </aside>
     );
 };
-
 export default Sidebar;

@@ -1,39 +1,55 @@
-// Layout.js
 "use client";
-import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import React, { useState, useCallback, useEffect } from "react";
+import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 
+const DURATION = "duration-300";
+
 const Layout = ({ children }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  const toggleSidebar = useCallback(() => {
+    if (window.innerWidth < 768 && isSidebarOpen) {
+      setIsSidebarOpen(false);
+    } else {
+      setIsSidebarOpen((prev) => !prev);
+    }
+  }, [isSidebarOpen]);
+
+  // Optional: Automatically close sidebar when resizing below md
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) setIsSidebarOpen(false);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const sidebarContentOffset = isSidebarOpen ? "ml-64" : "ml-20";
+  const contentMarginClass = `md:${sidebarContentOffset}`;
 
   return (
-    <div className="flex min-h-screen bg-gray-100 text-black">
-      <Sidebar isOpen={isSidebarOpen} />
+    <div className="min-h-screen bg-gray-100 text-gray-900 relative">
+      {/* Navbar */}
+      <Navbar isSidebarOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile header */}
-        <header className="flex justify-between items-center p-4 bg-white shadow md:hidden">
-          <div className="text-xl font-semibold">Page Title</div>
-          <button onClick={toggleSidebar} className="p-2 text-gray-600 focus:outline-none">
-            {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
-        </header>
+      {/* Sidebar */}
+      <Sidebar isSidebarOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
 
-        {/* Overlay when sidebar is open on mobile */}
+      {/* Main Content */}
+      <div
+        className={`flex-1 flex flex-col overflow-hidden pt-16 transition-all ${DURATION} ${contentMarginClass}`}
+      >
+        {/* Overlay (for mobile) */}
         {isSidebarOpen && (
           <div
             onClick={toggleSidebar}
-            className="fixed inset-0 z-20 bg-black opacity-50 md:hidden"
+            className="fixed inset-0 z-40 bg-black opacity-50 md:hidden"
+            aria-hidden="true"
           ></div>
         )}
 
-        {/* Scrollable main content */}
-        <main className="p-6 overflow-auto h-screen">
-          {children}
-        </main>
+        <main className="p-4 sm:p-6 flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
   );

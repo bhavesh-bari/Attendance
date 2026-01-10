@@ -17,7 +17,7 @@ const Card = ({ title, value, icon, colorClass, delta, description }) => (
 );
 
 const SummaryCards = () => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
         <Card
             title="Today's Overall"
             value="89.5%"
@@ -57,6 +57,14 @@ const SummaryCards = () => (
             colorClass="bg-orange-600 border-b-4 border-orange-800"
             delta="Oct 25"
             description="Expected Drop"
+        />
+        <Card
+            title="Most Events"
+            value="10"
+            icon={<span className="text-4xl">📊</span>}
+            colorClass="bg-yellow-400 border-b-4 border-yellow-600 text-gray-900"
+            delta="+4 This Month"
+            description="By Mech Dept"
         />
     </div>
 );

@@ -1,149 +1,279 @@
 "use client";
 import React, { useState } from "react";
+import {
+    Sun,
+    Moon,
+    Users,
+    Edit2,
+    Save,
+    CalendarDays,
+} from "lucide-react";
 
-const YEAR_OPTIONS = ["2nd Year", "3rd Year", "4th Year"];
-const SHIFT_OPTIONS = ["Morning", "Afternoon"];
+/* ---------------- MOCK DATA (Replace with API later) ---------------- */
 
-const initialClasses = [
+const classesList = [
     { id: 1, dept: "CSE", year: "3rd Year", div: "A", totalStudents: 60 },
     { id: 2, dept: "ECE", year: "2nd Year", div: "B", totalStudents: 55 },
 ];
 
+/* ---------------- MAIN COMPONENT ---------------- */
+
 const AttendanceComponent = () => {
-    const [classes] = useState(initialClasses);
-    const [attendanceData, setAttendanceData] = useState([]);
-    const [newAttendance, setNewAttendance] = useState({
-        shift: SHIFT_OPTIONS[0],
+    const [records, setRecords] = useState([]);
+    const [editingId, setEditingId] = useState(null);
+
+    const [form, setForm] = useState({
+        date: "",
         classId: "",
-        presentStudents: 0,
-        eventName: "",
+        morningCount: "",
+        morningEvent: "",
+        afternoonCount: "",
+        afternoonEvent: "",
     });
 
-    // --- Handlers ---
-    const handleAttendanceChange = (e) => {
+    /* ---------------- HANDLERS ---------------- */
+
+    const handleChange = (e) => {
         const { name, value } = e.target;
-        setNewAttendance((prev) => ({
-            ...prev,
-            [name]: name === "presentStudents" ? Number(value) : value,
-        }));
+        setForm((prev) => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmitAttendance = (e) => {
+    const handleSubmit = (e) => {
         e.preventDefault();
-        if (!newAttendance.classId || newAttendance.presentStudents < 0) return;
+        if (!form.classId || !form.date) return;
 
-        const record = {
-            id: Date.now(),
-            ...newAttendance,
-            className: classes.find((c) => c.id === Number(newAttendance.classId))
-                ?.dept + " - " + classes.find((c) => c.id === Number(newAttendance.classId))
-                    ?.year + " - " + classes.find((c) => c.id === Number(newAttendance.classId))
-                    ?.div,
-        };
+        const cls = classesList.find(
+            (c) => c.id === Number(form.classId)
+        );
 
-        setAttendanceData((prev) => [...prev, record]);
-        setNewAttendance({ shift: SHIFT_OPTIONS[0], classId: "", presentStudents: 0, eventName: "" });
+        setRecords((prev) => [
+            ...prev,
+            {
+                id: Date.now(),
+                date: form.date,
+                className: `${cls.dept} ${cls.year} ${cls.div}`,
+                totalStudents: cls.totalStudents,
+                morning: {
+                    count: Number(form.morningCount || 0),
+                    event: form.morningEvent,
+                },
+                afternoon: {
+                    count: Number(form.afternoonCount || 0),
+                    event: form.afternoonEvent,
+                },
+            },
+        ]);
+
+        setForm({
+            date: "",
+            classId: "",
+            morningCount: "",
+            morningEvent: "",
+            afternoonCount: "",
+            afternoonEvent: "",
+        });
     };
 
-    // --- Styling ---
-    const inputClasses =
-        "w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-300";
-    const baseButtonClasses =
-        "px-4 py-2 font-semibold text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300";
+    const handleSave = (id, updated) => {
+        setRecords((prev) =>
+            prev.map((r) => (r.id === id ? { ...r, ...updated } : r))
+        );
+        setEditingId(null);
+    };
+
+    /* ---------------- UI ---------------- */
 
     return (
-        <div className="min-h-screen bg-gray-100 p-6 font-sans overflow-auto">
-            <div className="max-w-4xl mx-auto space-y-8">
-                <h1 className="text-4xl font-extrabold text-center text-gray-900">
-                    Attendance System 📝
+        <div className="min-h-screen bg-slate-100 p-6">
+            <div className="max-w-5xl mx-auto space-y-8">
+
+                {/* HEADER */}
+                <h1 className="text-4xl font-bold text-center text-slate-800">
+                    Daily Attendance Management
                 </h1>
 
-                {/* Attendance Form */}
+                {/* FORM */}
                 <form
-                    onSubmit={handleSubmitAttendance}
-                    className="p-6 space-y-4 bg-white rounded-xl shadow-xl border-t-4 border-indigo-500"
+                    onSubmit={handleSubmit}
+                    className="bg-white p-6 rounded-2xl shadow-lg space-y-6"
                 >
-                    <h3 className="text-2xl font-bold text-gray-800">Fill Attendance</h3>
+                    <h2 className="text-2xl font-semibold text-slate-700">
+                        Mark Attendance
+                    </h2>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <select
-                            name="shift"
-                            value={newAttendance.shift}
-                            onChange={handleAttendanceChange}
-                            className={inputClasses}
-                        >
-                            {SHIFT_OPTIONS.map((shift) => (
-                                <option key={shift} value={shift}>
-                                    {shift} Shift
-                                </option>
-                            ))}
-                        </select>
+                    {/* DATE + CLASS */}
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <div className="flex items-center gap-3">
+                            <CalendarDays className="text-indigo-600" />
+                            <input
+                                type="date"
+                                name="date"
+                                value={form.date}
+                                onChange={handleChange}
+                                className="w-full p-3 border rounded-lg"
+                                required
+                            />
+                        </div>
 
                         <select
                             name="classId"
-                            value={newAttendance.classId}
-                            onChange={handleAttendanceChange}
-                            className={inputClasses}
+                            value={form.classId}
+                            onChange={handleChange}
+                            className="w-full p-3 border rounded-lg"
+                            required
                         >
                             <option value="">Select Class</option>
-                            {classes.map((cls) => (
+                            {classesList.map((cls) => (
                                 <option key={cls.id} value={cls.id}>
-                                    {cls.dept} - {cls.year} - {cls.div} (Total: {cls.totalStudents})
+                                    {cls.dept} {cls.year} {cls.div} (Total {cls.totalStudents})
                                 </option>
                             ))}
                         </select>
-
-                        <input
-                            type="number"
-                            name="presentStudents"
-                            min="0"
-                            placeholder="No. of Students Present"
-                            value={newAttendance.presentStudents}
-                            onChange={handleAttendanceChange}
-                            className={inputClasses}
-                            required
-                        />
-
-                        <input
-                            type="text"
-                            name="eventName"
-                            placeholder="Event Name (if any)"
-                            value={newAttendance.eventName}
-                            onChange={handleAttendanceChange}
-                            className={inputClasses}
-                        />
                     </div>
 
-                    <button
-                        type="submit"
-                        className={`${baseButtonClasses} w-full bg-indigo-600 hover:bg-indigo-700 hover:scale-[1.01]`}
-                    >
-                        Submit Attendance
+                    {/* MORNING & AFTERNOON */}
+                    <div className="grid md:grid-cols-2 gap-6">
+
+                        {/* MORNING */}
+                        <div className="bg-yellow-50 p-4 rounded-xl space-y-3">
+                            <div className="flex items-center gap-2 font-semibold text-yellow-700">
+                                <Sun size={18} /> Morning Session
+                            </div>
+
+                            <input
+                                type="number"
+                                name="morningCount"
+                                min="0"
+                                placeholder="Present Students"
+                                value={form.morningCount}
+                                onChange={handleChange}
+                                className="w-full p-2 border rounded"
+                            />
+
+                            <input
+                                type="text"
+                                name="morningEvent"
+                                placeholder="Event (optional)"
+                                value={form.morningEvent}
+                                onChange={handleChange}
+                                className="w-full p-2 border rounded"
+                            />
+                        </div>
+
+                        {/* AFTERNOON */}
+                        <div className="bg-indigo-50 p-4 rounded-xl space-y-3">
+                            <div className="flex items-center gap-2 font-semibold text-indigo-700">
+                                <Moon size={18} /> Afternoon Session
+                            </div>
+
+                            <input
+                                type="number"
+                                name="afternoonCount"
+                                min="0"
+                                placeholder="Present Students"
+                                value={form.afternoonCount}
+                                onChange={handleChange}
+                                className="w-full p-2 border rounded"
+                            />
+
+                            <input
+                                type="text"
+                                name="afternoonEvent"
+                                placeholder="Event (optional)"
+                                value={form.afternoonEvent}
+                                onChange={handleChange}
+                                className="w-full p-2 border rounded"
+                            />
+                        </div>
+
+                    </div>
+
+                    <button className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
+                        Save Attendance
                     </button>
                 </form>
 
-                {/* Attendance Records */}
+                {/* RECORDS */}
                 <div className="space-y-4">
-                    <h2 className="text-3xl font-semibold text-gray-800">
-                        Attendance Records ({attendanceData.length})
+                    <h2 className="text-2xl font-semibold text-slate-700">
+                        Attendance Records
                     </h2>
-                    {attendanceData.map((record) => (
-                        <div
-                            key={record.id}
-                            className="p-4 border-l-4 rounded-lg bg-white border-green-500 shadow hover:shadow-xl transition-all duration-300"
-                        >
-                            <p className="font-bold text-lg">
-                                {record.className} - {record.shift} Shift
-                            </p>
-                            <p>
-                                Present Students: {record.presentStudents}{" "}
-                                {record.eventName && (
-                                    <span>| Event: {record.eventName}</span>
-                                )}
-                            </p>
-                        </div>
+
+                    {records.map((rec) => (
+                        <AttendanceCard
+                            key={rec.id}
+                            record={rec}
+                            isEditing={editingId === rec.id}
+                            onEdit={() => setEditingId(rec.id)}
+                            onSave={handleSave}
+                        />
                     ))}
                 </div>
+
+            </div>
+        </div>
+    );
+};
+
+/* ---------------- RECORD CARD ---------------- */
+
+const AttendanceCard = ({ record, isEditing, onEdit, onSave }) => {
+    const [editData, setEditData] = useState(record);
+
+    return (
+        <div className="bg-white rounded-xl shadow-md p-5 border-l-4 border-indigo-500">
+            <div className="flex justify-between items-start">
+                <div>
+                    <h3 className="text-xl font-bold">
+                        {record.className}
+                    </h3>
+
+                    <p className="text-sm text-slate-500">
+                        📅 {record.date}
+                    </p>
+
+                    <p className="mt-2 text-slate-700">
+                        🌅 Morning: {record.morning.count}
+                        {record.morning.event && (
+                            <span className="text-sm text-slate-500">
+                                {" "} | 📌 {record.morning.event}
+                            </span>
+                        )}
+                    </p>
+
+                    <p className="text-slate-700">
+                        🌇 Afternoon: {record.afternoon.count}
+                        {record.afternoon.event && (
+                            <span className="text-sm text-slate-500">
+                                {" "} | 📌 {record.afternoon.event}
+                            </span>
+                        )}
+                    </p>
+                </div>
+
+                {!isEditing ? (
+                    <button onClick={onEdit}>
+                        <Edit2 className="text-indigo-600" />
+                    </button>
+                ) : (
+                    <button
+                        onClick={() =>
+                            onSave(record.id, {
+                                ...editData,
+                                morning: {
+                                    ...editData.morning,
+                                    count: Number(editData.morning.count),
+                                },
+                                afternoon: {
+                                    ...editData.afternoon,
+                                    count: Number(editData.afternoon.count),
+                                },
+                            })
+                        }
+                    >
+                        <Save className="text-green-600" />
+                    </button>
+                )}
             </div>
         </div>
     );

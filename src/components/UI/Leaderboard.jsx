@@ -1,9 +1,9 @@
 // /components/Leaderboard.js
 import React from 'react';
 
-// Card component for a single leaderboard entry
+
 const LeaderboardItem = ({ rank, dept, division, year, percentage, isTop }) => {
-    // Green for Top performers, Red for Bottom performers
+
     const colorClass = isTop ? 'text-green-600 bg-green-50 border-green-500' : 'text-red-600 bg-red-50 border-red-500';
     const indicatorClass = isTop ? 'bg-green-600' : 'bg-red-600';
 
@@ -28,17 +28,17 @@ const LeaderboardItem = ({ rank, dept, division, year, percentage, isTop }) => {
 
 
 const Leaderboard = ({ data }) => {
-    // 1. Sort the data by avgAttendance
+
     const sortedData = [...data].sort((a, b) => b.avgAttendance - a.avgAttendance);
 
-    // 2. Identify Top 3 and Bottom 3
+
     const topPerformers = sortedData.slice(0, 3);
-    const bottomPerformers = sortedData.slice(-3).reverse(); // Reverse to show rank 1, 2, 3 from the bottom
+    const bottomPerformers = sortedData.slice(-3).reverse();
 
     return (
         <div className="space-y-6">
 
-            {/* Top Performers (Green) */}
+
             <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-green-500">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
                     Top 3 Divisions 🏆
@@ -58,7 +58,7 @@ const Leaderboard = ({ data }) => {
                 </div>
             </div>
 
-            {/* Bottom Performers (Red) */}
+
             <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-red-500">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
                     Bottom 3 Divisions 🚨
@@ -67,7 +67,7 @@ const Leaderboard = ({ data }) => {
                     {bottomPerformers.map((item, index) => (
                         <LeaderboardItem
                             key={`bottom-${index}`}
-                            rank={index + 1} // Rank 1 is the absolute lowest
+                            rank={index + 1}
                             dept={item.dept}
                             division={item.div}
                             year={item.year}
