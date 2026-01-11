@@ -17,23 +17,30 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
     const sidebarWidthClass = isSidebarOpen ? SIDEBAR_WIDTH_FULL : SIDEBAR_WIDTH_COLLAPSED;
 
     return (
-        <aside
-            className={`
-                fixed top-16 bottom-0 left-0 z-50 bg-gray-900 text-white flex flex-col shadow-2xl
-                transition-all ${DURATION} ease-in-out
-                ${sidebarWidthClass} 
-                
-                /* Mobile: Slides completely out/in below md breakpoint */
-                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
-                md:translate-x-0
-            `}
+       <aside
+  className={`
+    fixed top-16 bottom-0 left-0 z-50 
+    flex flex-col shadow-2xl
+    transition-all ${DURATION} ease-in-out
+    ${sidebarWidthClass}
+
+    /* Glassmorphism */
+    bg-gray-950/50 backdrop-blur-md
+    border-r border-white/10
+
+    /* Mobile slide */
+    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+    md:translate-x-0
+  `}
+
+
         >
 
 
             <nav className="flex flex-col p-2 space-y-2  flex-1">
                 {navItems.map((item) => (
                     <a key={item.name} href={item.href} onClick={toggleSidebar}
-                        className="group flex items-center px-3 py-2 rounded-xl text-gray-300 hover:bg-gray-700 hover:text-white transition-colors relative"
+                        className="group flex items-center px-3 py-2 rounded-xl text-white hover:bg-gray-700 hover:text-blue-200  transition-colors relative"
                     >
                         <item.icon className={`w-6 h-6 flex-shrink-0 ${isSidebarOpen ? 'mr-3' : 'mr-0'}`} />
 

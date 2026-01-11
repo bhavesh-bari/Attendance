@@ -84,7 +84,7 @@ const AttendanceComponent = () => {
     /* ---------------- UI ---------------- */
 
     return (
-        <div className="min-h-screen bg-slate-100 p-6">
+        <div className="min-h-screen bg-slate-100 p-6 ">
             <div className="max-w-5xl mx-auto space-y-8">
 
                 {/* HEADER */}
@@ -95,7 +95,7 @@ const AttendanceComponent = () => {
                 {/* FORM */}
                 <form
                     onSubmit={handleSubmit}
-                    className="bg-white p-6 rounded-2xl shadow-lg space-y-6"
+                    className=" p-6 rounded-2xl shadow-lg space-y-6 "
                 >
                     <h2 className="text-2xl font-semibold text-slate-700">
                         Mark Attendance

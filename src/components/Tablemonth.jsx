@@ -221,7 +221,7 @@ export default function GroupedAttendanceTable() {
 
                     <tbody>
                         {departments.map((d) => (
-                            <tr key={d.id} className="hover:bg-gray-50">
+                            <tr key={d.id} className="hover:bg-gray-50 whitespace-nowrap">
                                 <td className="border p-2 text-center">{d.id}</td>
                                 <td className="border p-2 font-semibold">{d.name}</td>
 

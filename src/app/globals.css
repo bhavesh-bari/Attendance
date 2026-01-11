@@ -1,4 +1,7 @@
+
+
 @import "tailwindcss";
+
 
 :root {
   --background: #ffffff;
@@ -30,4 +33,67 @@ body {
 .hide-scrollbar {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;     /* Firefox */
+}
+.peaky-text {
+  font-family: 
+    "Arial Narrow",
+    "Impact",
+    "Haettenschweiler",
+    "Franklin Gothic Medium",
+    "Segoe UI",
+    sans-serif;
+
+  font-weight: 700;
+
+  text-transform: uppercase;
+}
+.college-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.college-text img {
+  height: 28px;
+}
+.rotating-border {
+  position: relative;
+  border-radius: 14px;
+  padding: 3px;
+  overflow: hidden;
+}
+
+
+.rotating-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: conic-gradient(
+    red,
+    #3b82f6,
+    yellow,
+    cyan,
+    blue,
+    red
+  );
+  animation: spinLine 3s linear infinite;
+}
+
+
+.rotating-border > div {
+  position: relative;
+  z-index: 1;
+  background: white;
+  border-radius: 12px;
+}
+
+
+@keyframes spinLine {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
