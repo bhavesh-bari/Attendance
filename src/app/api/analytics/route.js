@@ -6,39 +6,40 @@ import Class from "@/models/Class";
 export async function GET(req) {
   try {
     await connectDB();
-
     const { searchParams } = new URL(req.url);
 
-    const scope = searchParams.get("scope") || "institution"; // institution | department
+    /* =======================
+       PARAMS
+    ======================= */
+    const scope = searchParams.get("scope") || "institution";
     const department = searchParams.get("department");
-    const period = searchParams.get("period") || "overall";
-    const shift = searchParams.get("shift") || "overall";
 
+    const period = searchParams.get("period") || "overall";
+    const mode = searchParams.get("mode"); // compare
+    const compareType = searchParams.get("compareType");
+    const left = searchParams.get("left");
+    const right = searchParams.get("right");
+
+    /* =======================
+       DATE LOGIC
+    ======================= */
     let startDate = null;
     let endDate = null;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    /* =======================
-       DATE FILTER LOGIC
-    ======================= */
     if (period === "today") {
       startDate = today;
       endDate = today;
-    }
-
-    if (period === "month") {
+    } else if (period === "month") {
       startDate = new Date(today.getFullYear(), today.getMonth(), 1);
       endDate = today;
-    }
-
-    if (period === "date") {
+    } else if (period === "date") {
       startDate = new Date(searchParams.get("date"));
       startDate.setHours(0, 0, 0, 0);
       endDate = startDate;
-    }
-
-    if (period === "range") {
+    } else if (period === "range") {
       startDate = new Date(searchParams.get("from"));
       endDate = new Date(searchParams.get("to"));
       startDate.setHours(0, 0, 0, 0);
@@ -46,52 +47,236 @@ export async function GET(req) {
     }
 
     const dateQuery =
-      startDate && endDate
-        ? { date: { $gte: startDate, $lte: endDate } }
-        : {};
+      startDate && endDate ? { date: { $gte: startDate, $lte: endDate } } : {};
 
     /* =======================
-       FETCH DATA
+       FETCH
     ======================= */
     const [attendance, classes] = await Promise.all([
       Attendance.find(dateQuery),
-      Class.find(scope === "department" ? { department } : {})
+      Class.find({})
     ]);
 
     const classMap = {};
-    classes.forEach(c => {
-      classMap[c._id.toString()] = c;
-    });
+    classes.forEach(c => (classMap[c._id.toString()] = c));
 
+    const departments = [...new Set(classes.map(c => c.department))];
+    console.log('Departments:', departments, departments.length);
+    const len = departments.length;
     /* =======================
-       METRIC HELPERS
+       HELPERS
     ======================= */
-    const getAttendanceValue = (a, cls) => {
-      if (shift === "morning") return (a.MornCount / cls.totalStudents) * 100;
-      if (shift === "afternoon") return (a.AftCount / cls.totalStudents) * 100;
-      return ((a.MornCount + a.AftCount) / 2 / cls.totalStudents) * 100;
+    const calcAttendance = (records, type = "overall") => {
+      let total = 0, count = 0;
+      records.forEach(a => {
+        const cls = classMap[a.classId?.toString()];
+        if (!cls) return;
+
+        let val =
+          type === "morning"
+            ? a.MornCount
+            : type === "afternoon"
+              ? a.AftCount
+              : (a.MornCount + a.AftCount) / 2;
+
+        total += (val / cls.totalStudents) * 100;
+        count++;
+      });
+      return count ? (total / count).toFixed(1) : "0.0";
     };
 
-    /* =======================
-       CLASS LEVEL ANALYTICS
-    ======================= */
-    const classStats = {};
+    const byDate = (records, from, to) =>
+      records.filter(r => r.date >= from && r.date <= to);
 
-    attendance.forEach(a => {
-      const cls = classMap[a.classId?.toString()];
-      if (!cls) return;
+    /* =====================================================
+       COMPARE (NO RETURN HERE)
+    ===================================================== */
+    let compare = null;
 
-      if (!classStats[cls.name]) {
-        classStats[cls.name] = {
-          className: cls.name,
-          department: cls.department,
-          total: 0,
-          count: 0
+    if (mode === "compare") {
+
+      /* =======================
+         DEPARTMENT VS DEPARTMENT
+         ======================= */
+      if (compareType === "department") {
+
+        const buildDept = dept => {
+          const deptClasses = classes.filter(c => c.department === dept);
+          const ids = deptClasses.map(c => c._id.toString());
+
+          const records = attendance.filter(a =>
+            ids.includes(a.classId?.toString())
+          );
+
+          const todayRec = byDate(records, today, today);
+          const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+          const monthRec = byDate(records, monthStart, today);
+
+          const bestClass = deptClasses
+            .map(c => {
+              const rec = attendance.filter(
+                a => a.classId?.toString() === c._id.toString()
+              );
+              return { className: c.name, avg: calcAttendance(rec) };
+            })
+            .sort((a, b) => b.avg - a.avg)[0];
+
+          const rank =
+            departments
+              .map(d => ({
+                d,
+                avg: calcAttendance(
+                  attendance.filter(a =>
+                    classes
+                      .filter(c => c.department === d)
+                      .map(c => c._id.toString())
+                      .includes(a.classId?.toString())
+                  )
+                )
+              }))
+              .sort((a, b) => b.avg - a.avg)
+              .findIndex(x => x.d === dept) + 1;
+
+          const recentEvent = records
+            .filter(r => r.isEvent)
+            .sort((a, b) => b.date - a.date)[0];
+
+          return {
+            department: dept,
+
+            overall: {
+              attendance: calcAttendance(records),
+              morning: calcAttendance(records, "morning"),
+              afternoon: calcAttendance(records, "afternoon"),
+              totalEvents: records.filter(r => r.isEvent).length
+            },
+
+            today: {
+              attendance: calcAttendance(todayRec),
+              morning: calcAttendance(todayRec, "morning"),
+              totalEvents: todayRec.filter(r => r.isEvent).length
+            },
+
+            month: {
+              attendance: calcAttendance(monthRec),
+              morning: calcAttendance(monthRec, "morning"),
+              totalEvents: monthRec.filter(r => r.isEvent).length
+            },
+
+            totalClasses: deptClasses.length,
+            bestClass,
+            departmentRank: `#${rank}`,
+            recentEvent: recentEvent
+              ? {
+                name: recentEvent.MEventName || recentEvent.AEventName,
+                date: recentEvent.date
+              }
+              : null
+          };
+        };
+
+        compare = {
+          type: "department",
+          left: buildDept(left),
+          right: buildDept(right)
         };
       }
 
-      classStats[cls.name].total += getAttendanceValue(a, cls);
-      classStats[cls.name].count += 1;
+      /* =================
+         CLASS VS CLASS
+         ================= */
+      if (compareType === "class") {
+
+        const buildClass = className => {
+          const cls = classes.find(c => c.name === className);
+          if (!cls) return null;
+
+          const records = attendance.filter(
+            a => a.classId?.toString() === cls._id.toString()
+          );
+
+          const todayRec = byDate(records, today, today);
+          const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+          const monthRec = byDate(records, monthStart, today);
+
+          const deptClasses = classes.filter(c => c.department === cls.department);
+
+          const rank =
+            deptClasses
+              .map(c => ({
+                name: c.name,
+                avg: calcAttendance(
+                  attendance.filter(
+                    a => a.classId?.toString() === c._id.toString()
+                  )
+                )
+              }))
+              .sort((a, b) => b.avg - a.avg)
+              .findIndex(x => x.name === cls.name) + 1;
+
+          const recentEvent = records
+            .filter(r => r.isEvent)
+            .sort((a, b) => b.date - a.date)[0];
+
+          return {
+            className: cls.name,
+            department: cls.department,
+
+            overall: {
+              attendance: calcAttendance(records),
+              morning: calcAttendance(records, "morning"),
+              afternoon: calcAttendance(records, "afternoon"),
+              totalEvents: records.filter(r => r.isEvent).length
+            },
+
+            today: {
+              attendance: calcAttendance(todayRec),
+              morning: calcAttendance(todayRec, "morning"),
+              totalEvents: todayRec.filter(r => r.isEvent).length
+            },
+
+            month: {
+              attendance: calcAttendance(monthRec),
+              morning: calcAttendance(monthRec, "morning"),
+              totalEvents: monthRec.filter(r => r.isEvent).length
+            },
+
+            rankInDepartment: `#${rank}`,
+            recentEvent: recentEvent
+              ? {
+                name: recentEvent.MEventName || recentEvent.AEventName,
+                date: recentEvent.date
+              }
+              : null
+          };
+        };
+
+        compare = {
+          type: "class",
+          left: buildClass(left),
+          right: buildClass(right)
+        };
+      }
+    }
+
+
+    /* =====================================================
+       NORMAL ANALYTICS
+    ===================================================== */
+    const filteredClasses =
+      scope === "department" && department
+        ? classes.filter(c => c.department === department)
+        : classes;
+
+    const classStats = {};
+    attendance.forEach(a => {
+      const cls = classMap[a.classId?.toString()];
+      if (!cls) return;
+      if (scope === "department" && department && cls.department !== department) return;
+
+      classStats[cls.name] ??= { className: cls.name, department: cls.department, total: 0, count: 0 };
+      classStats[cls.name].total += Number(calcAttendance([a]));
+      classStats[cls.name].count++;
     });
 
     const classAnalytics = Object.values(classStats).map(c => ({
@@ -99,65 +284,48 @@ export async function GET(req) {
       percentage: (c.total / c.count).toFixed(1)
     }));
 
-    /* =======================
-       EVENT ANALYTICS
-    ======================= */
-    const eventCount = {};
-
-    attendance.forEach(a => {
-      if (a.isEvent) {
-        const cls = classMap[a.classId?.toString()];
-        if (!cls) return;
-        eventCount[cls.department] = (eventCount[cls.department] || 0) + 1;
-      }
-    });
-
-    /* =======================
-       SUMMARY METRICS
-    ======================= */
     const avgAttendance =
       classAnalytics.reduce((s, c) => s + Number(c.percentage), 0) /
       (classAnalytics.length || 1);
 
-    const topClass = classAnalytics.sort(
-      (a, b) => b.percentage - a.percentage
-    )[0];
-
     /* =======================
-       RESPONSE
+       FINAL RESPONSE
     ======================= */
     return NextResponse.json({
       success: true,
-      scope,
-      period,
-      shift,
+
+      filters: {
+        scope,
+        department,
+        period,
+        availableDepartments: departments,
+        availableClasses:
+          department
+            ? classes.filter(c => c.department === department)
+            : classes
+      },
 
       summary:
         scope === "institution"
           ? {
-              overallAvgAttendance: avgAttendance.toFixed(1),
-              totalDivisions: classes.length,
-              activeDepartments: [
-                ...new Set(classes.map(c => c.department))
-              ].length
-            }
+            overallAvgAttendance: avgAttendance.toFixed(1),
+            totalDivisions: classes.length,
+            activeDepartments: len
+          }
           : {
-              department,
-              departmentAvgAttendance: avgAttendance.toFixed(1),
-              totalDivisions: classes.length,
-              topPerformingClass: topClass?.className
-            },
+            department,
+            departmentAvgAttendance: avgAttendance.toFixed(1),
+            totalDivisions: filteredClasses.length
+          },
 
       analytics: {
-        classes: classAnalytics,
-        eventCount
-      }
+        classes: classAnalytics
+      },
+
+      compare // ✅ INCLUDED TOGETHER
     });
 
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
