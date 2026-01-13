@@ -1,10 +1,100 @@
 "use client";
 import React, { useState, useMemo } from "react";
-// Ensure correct paths to your components
+// Ensure correct paths to your other components
 import ClassesComparison from "@/components/UI/analytics/ClassesComparision";
 import DepartmentClassAttendanceChart from "@/components/UI/analytics/ClassAttendanceChart";
 import ClassesEvents from "@/components/UI/analytics/ClassesEvents";
-import Filter from "@/components/UI/Filter";
+
+/* =========================================================================
+   INTERNAL FILTER COMPONENT
+   ========================================================================= */
+const Filter = ({ filters, onFilterChange, excludedFilters = [] }) => {
+
+    const handleSelectChange = (e) => {
+        const { name, value } = e.target;
+        onFilterChange(name, value);
+    };
+
+    const isExcluded = (name) => excludedFilters.includes(name);
+
+    return (
+        <div className="w-full overflow-x-auto py-2 hide-scrollbar" >
+            <div className="flex gap-4 min-w-max px-2">
+
+                {/* Department Filter */}
+                {!isExcluded("department") && (
+                    <select
+                        name="department"
+                        value={filters.department}
+                        onChange={handleSelectChange}
+                        className="border bg-white border-gray-300 rounded-lg px-4 py-2 text-sm shadow-sm hover:border-indigo-400 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        <option value="All Departments">All Departments</option>
+                        <option value="Mechanical Engineering (ME)">Mechanical Engineering (ME)</option>
+                        <option value="Civil Engineering (CE)">Civil Engineering (CE)</option>
+                        <option value="Computer Science (CS)">Computer Science (CS)</option>
+                        <option value="Electrical Engineering (EE)">Electrical Engineering (EE)</option>
+                    </select>
+                )}
+
+                {/* Shift Filter */}
+                {!isExcluded("shift") && (
+                    <select
+                        name="shift"
+                        value={filters.shift}
+                        onChange={handleSelectChange}
+                        className="border bg-white border-gray-300 rounded-lg px-4 py-2 text-sm shadow-sm hover:border-indigo-400 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        <option value="overall">Overall</option>
+                        <option value="morning">Morning</option>
+                        <option value="afternoon">Afternoon</option>
+                        <option value="both">Both</option>
+                    </select>
+                )}
+
+                {/* Time Period Filter */}
+                {!isExcluded("timePeriod") && (
+                    <select
+                        name="timePeriod"
+                        value={filters.timePeriod}
+                        onChange={handleSelectChange}
+                        className="border bg-white border-gray-300 rounded-lg px-4 py-2 text-sm shadow-sm hover:border-indigo-400 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                        <option value="overall">Overall</option>
+                        <option value="today">Today</option>
+                        <option value="monthly">This Month</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                )}
+
+                {/* Custom Date Range - Only show if timePeriod is custom */}
+                {filters.timePeriod === "custom" && !isExcluded("startDate") && !isExcluded("endDate") && (
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="date"
+                            name="startDate"
+                            value={filters.startDate}
+                            onChange={handleSelectChange}
+                            className="border bg-white border-gray-300 rounded-lg px-3 py-2 text-sm shadow-sm hover:border-indigo-400 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <span className="text-sm text-gray-500">to</span>
+                        <input
+                            type="date"
+                            name="endDate"
+                            value={filters.endDate}
+                            onChange={handleSelectChange}
+                            className="border bg-white border-gray-300 rounded-lg px-3 py-2 text-sm shadow-sm hover:border-indigo-400 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+/* =========================================================================
+   DUMMY DATA & CONSTANTS
+   ========================================================================= */
 
 // Enhanced DUMMY DATA for filtering demonstration
 const INITIAL_DEPARTMENT_CLASS_DATA = {
@@ -37,6 +127,10 @@ const INITIAL_EVENTS = [
     { event: "Circuit Debugging", date: "2025-11-10", classes: ["CS-A-1"], department: "Computer Science (CS)", shift: "afternoon" },
 ];
 
+/* =========================================================================
+   MAIN COMPONENT
+   ========================================================================= */
+
 export default function DepartmentAnalytics() {
     // Centralized Filter State
     const [filters, setFilters] = useState({
@@ -65,9 +159,8 @@ export default function DepartmentAnalytics() {
             INITIAL_DEPARTMENT_CLASS_DATA[dept]?.classes || []
         );
 
-        // NOTE: Time period filtering (timePeriod, startDate, endDate) would normally happen here by
-        // adjusting the data values (overall/morning/afternoon) based on a server query.
-        // For DUMMY DATA, we skip the time filter's value application but retain the filter UI.
+        // NOTE: Time period filtering would happen here (adjusting overall/morning/afternoon values)
+        // For DUMMY DATA, we skip value adjustment but retain the structure.
 
         return allClasses.map(cls => ({
             name: cls.name,
@@ -78,7 +171,6 @@ export default function DepartmentAnalytics() {
     }, [filters]);
 
     // --- Filtering Logic for COMPARISON CHART ---
-    // Comparison Chart only filters by Department, not Shift or Time
     const filteredComparisonData = useMemo(() => {
         const { department } = filters;
 
@@ -104,8 +196,9 @@ export default function DepartmentAnalytics() {
     }, [filters]);
 
 
-    // Determine the department name to display in the header for the bar chart
+    // Determine the department name to display in the header
     const currentDeptForChart = filters.department === "All Departments" ? "All Departments" : filters.department;
+
     const OverallAnalyticsSummary = () => (
         <div className="p-6 md:p-8 bg-white rounded-xl shadow-lg transition-opacity duration-500 ease-in-out">
             <h3 className="text-lg md:text-xl font-semibold text-indigo-600 mb-4">
@@ -150,17 +243,21 @@ export default function DepartmentAnalytics() {
             </p>
         </div>
     );
+
     return (
         <div className="p-2 bg-gray-100 rounded-xl shadow-lg transition-opacity duration-500 ease-in-out space-y-4 w-full">
 
-            {/* Filter Component - All Filters used here */}
-            <div className="bg-white rounded-lg shadow-md p-2">
+            {/* Filter Component - Directly integrated */}
+
+
+            <OverallAnalyticsSummary />
+                        <div className="bg-white rounded-lg shadow-md p-2">
                 <Filter
                     filters={filters}
                     onFilterChange={handleFilterChange}
                 />
             </div>
-            <OverallAnalyticsSummary />
+
             {/* Attendance Bar Chart - Filters: Department, Shift, Time */}
             <div className="bg-white rounded-lg shadow-md">
                 <DepartmentClassAttendanceChart
@@ -175,11 +272,11 @@ export default function DepartmentAnalytics() {
                 <ClassesEvents
                     department={currentDeptForChart}
                     events={filteredEvents}
-                    onClose={() => handleFilterChange("department", "All Departments")} // Example: clicking 'back' resets department filter
+                    onClose={() => handleFilterChange("department", "All Departments")}
                 />
             </div>
 
-            {/* Classes Comparison Section - Filters: Department, Time (Shift excluded) */}
+            {/* Classes Comparison Section - Filters: Department, Time */}
             <div className="border rounded-lg bg-indigo-50 p-4">
                 <h3 className="text-xl font-medium text-indigo-700 mb-3">
                     Classes Comparison (Filtered by Department & Time)

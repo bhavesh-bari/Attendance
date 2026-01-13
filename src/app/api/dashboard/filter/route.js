@@ -71,58 +71,89 @@ export async function GET(req) {
             classMap[c._id.toString()] = c;
         });
 
-        /* ===============================
-           1️⃣ Department Attendance by Class & Shift
-        =============================== */
-        const departmentAttendance = attendanceData.map(d => {
-            const cls = classMap[d.classId?.toString()];
-            const total = cls?.totalStudents || 1;
+        /* =====================================================
+           1️⃣ DEPARTMENT ATTENDANCE (FIXED – AGGREGATED)
+        ===================================================== */
+        const attendanceAgg = {};
 
-            return {
-                department: cls?.department,
-                className: cls?.name,
-                morningPercent: ((d.MornCount / total) * 100).toFixed(1),
-                afternoonPercent: ((d.AftCount / total) * 100).toFixed(1)
-            };
+        attendanceData.forEach(d => {
+            const cls = classMap[d.classId?.toString()];
+            if (!cls) return;
+
+            const key = d.classId.toString();
+
+            if (!attendanceAgg[key]) {
+                attendanceAgg[key] = {
+                    department: cls.department,
+                    className: cls.name,
+                    totalMorning: 0,
+                    totalAfternoon: 0,
+                    days: 0,
+                    totalStudents: cls.totalStudents || 1
+                };
+            }
+
+            attendanceAgg[key].totalMorning += d.MornCount;
+            attendanceAgg[key].totalAfternoon += d.AftCount;
+            attendanceAgg[key].days += 1;
         });
 
-        /* ===============================
-           2️⃣ Event Counts by Class
-        =============================== */
+        const departmentAttendance = Object.values(attendanceAgg).map(d => ({
+            department: d.department,
+            className: d.className,
+            morningPercent: (
+                (d.totalMorning / d.days / d.totalStudents) * 100
+            ).toFixed(1),
+            afternoonPercent: (
+                (d.totalAfternoon / d.days / d.totalStudents) * 100
+            ).toFixed(1)
+        }));
+
+        /* =====================================================
+           2️⃣ EVENT COUNTS (FIXED)
+        ===================================================== */
         const eventMap = {};
+
         attendanceData.forEach(d => {
             if (d.isEvent) {
                 eventMap[d.className] = (eventMap[d.className] || 0) + 1;
             }
         });
 
-        const eventCounts = Object.entries(eventMap).map(([className, count]) => ({
-            className,
-            count
-        }));
+        const eventCounts = Object.entries(eventMap).map(([className, count]) => {
+            const cls = classes.find(c => c.name === className);
+            return {
+                className,
+                department: cls?.department,
+                count
+            };
+        });
 
-        /* ===============================
-           3️⃣ Leaderboard (Avg Attendance)
-        =============================== */
+        /* =====================================================
+           3️⃣ LEADERBOARD (ALREADY CORRECT – CLEANED)
+        ===================================================== */
         const leaderboardMap = {};
 
         attendanceData.forEach(d => {
             const cls = classMap[d.classId?.toString()];
             if (!cls) return;
 
-            const avg =
-                (d.MornCount + d.AftCount) / 2 / cls.totalStudents * 100;
+            const totalStudents = cls.totalStudents || 1;
+            const avgPresent = (d.MornCount + d.AftCount) / 2;
+            const percent = (avgPresent / totalStudents) * 100;
 
             if (!leaderboardMap[d.className]) {
                 leaderboardMap[d.className] = {
                     className: d.className,
                     department: cls.department,
-                    total: 0,
+                    totalPercent: 0,
+                    totalPresent: 0,
                     count: 0
                 };
             }
 
-            leaderboardMap[d.className].total += avg;
+            leaderboardMap[d.className].totalPercent += percent;
+            leaderboardMap[d.className].totalPresent += avgPresent;
             leaderboardMap[d.className].count += 1;
         });
 
@@ -130,12 +161,13 @@ export async function GET(req) {
             .map(d => ({
                 className: d.className,
                 department: d.department,
-                percentage: (d.total / d.count).toFixed(1)
+                percentage: (d.totalPercent / d.count).toFixed(1),
+                studentCounts: Math.round(d.totalPresent / d.count)
             }))
             .sort((a, b) => b.percentage - a.percentage);
 
         /* ===============================
-           Final Response
+           FINAL RESPONSE
         =============================== */
         return NextResponse.json({
             success: true,

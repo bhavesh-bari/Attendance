@@ -19,7 +19,10 @@ const AttendanceSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-
+    department: {
+      type: String,
+      required: true,
+    },
     MornCount: { type: Number, default: 0 },
     AftCount: { type: Number, default: 0 },
 

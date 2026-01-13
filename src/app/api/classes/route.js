@@ -134,9 +134,18 @@ export async function GET(req) {
   try {
     await connectDB();
     const classes = await Class.find().sort({ createdAt: -1 });
-
+    const totalClasses = await Class.countDocuments();
+    const totalStudents = await Class.aggregate([
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$totalStudents" }
+        }
+      }
+    ]);
+    const totaldepartments = await Class.distinct("department");
     return NextResponse.json(
-      { success: true, classes },
+      { success: true, classes, totalClasses, totalStudents, totaldepartments: totaldepartments.length },
       { status: 200 }
     );
   } catch (error) {

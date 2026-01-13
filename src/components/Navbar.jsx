@@ -26,20 +26,20 @@ const Navbar = ({ isSidebarOpen, toggleSidebar }) => {
             focus:outline-none focus:ring-2 focus:ring-cyan-400
 "
           aria-label="Toggle Sidebar"
-        > 
-       
+        >
+
           <ToggleIcon className="w-6 h-6" />
         </button>
       </div>
 
-      <h1 className="peaky-text text-2xl  text-[#101828] ml-4" >
+      <h1 className="peaky-text text-2xl  text-[#101828] ml-4 hidden md:block" >
         HOD Panel Dashboard
       </h1>
-       <div >
-       <h2 className="college-text absolute right-4 bottom-4  ">
-            <img className="rounded-2xl size-8 " src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTPfRGkuQoqWR3mDkAT6l6gjRPN-zRI41VIxw&s" alt="JSPM Logo" />
-                  JSPM Narhe Technical Campus
-            </h2></div>
+      <div >
+        <h2 className="college-text absolute right-4 bottom-4  ">
+          <img className="rounded-2xl size-8 " src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTPfRGkuQoqWR3mDkAT6l6gjRPN-zRI41VIxw&s" alt="JSPM Logo" />
+          JSPM Narhe Technical Campus
+        </h2></div>
     </header>
   );
 };

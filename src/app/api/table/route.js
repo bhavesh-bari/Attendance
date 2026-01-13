@@ -10,17 +10,28 @@ const YEAR_MAP = {
     4: "BE"
 };
 
+// Reverse map for filtering query
+const REVERSE_YEAR_MAP = {
+    "FE": 1,
+    "SE": 2,
+    "TE": 3,
+    "BE": 4
+};
+
 export async function GET(req) {
     await connectDB();
 
     const { searchParams } = new URL(req.url);
 
     const departmentFilter = searchParams.get("department") || "ALL";
+    const yearFilter = searchParams.get("year") || "ALL"; // <--- NEW: Year Param
     const period = searchParams.get("period") || "overall";
 
     const dateParam = searchParams.get("date");
     const fromParam = searchParams.get("from");
     const toParam = searchParams.get("to");
+
+    const alldepartments = await Class.distinct("department");
 
     /* ================= DATE FILTER ================= */
     let startDate = null;
@@ -34,26 +45,22 @@ export async function GET(req) {
             startDate = new Date(today);
             endDate = new Date(today);
             break;
-
         case "month":
             startDate = new Date(today.getFullYear(), today.getMonth(), 1);
             endDate = new Date(today);
             break;
-
         case "date":
             if (dateParam) {
                 startDate = new Date(dateParam);
                 endDate = new Date(dateParam);
             }
             break;
-
         case "range":
             if (fromParam && toParam) {
                 startDate = new Date(fromParam);
                 endDate = new Date(toParam);
             }
             break;
-
         case "overall":
         default:
             break;
@@ -62,16 +69,26 @@ export async function GET(req) {
     if (startDate) startDate.setHours(0, 0, 0, 0);
     if (endDate) endDate.setHours(23, 59, 59, 999);
 
-    const dateQuery =
-        startDate && endDate
-            ? { date: { $gte: startDate, $lte: endDate } }
-            : {};
+    const dateQuery = startDate && endDate
+        ? { date: { $gte: startDate, $lte: endDate } }
+        : {};
 
-    /* ================= FETCH DATA ================= */
-    const classes = await Class.find(
-        departmentFilter === "ALL" ? {} : { department: departmentFilter }
-    ).lean();
+    /* ================= FETCH DATA (With Year Filter) ================= */
 
+    // Build Class Query
+    const classQuery = {};
+    if (departmentFilter !== "ALL") {
+        classQuery.department = departmentFilter;
+    }
+    // NEW: Add Year logic
+    if (yearFilter !== "ALL" && REVERSE_YEAR_MAP[yearFilter]) {
+        classQuery.year = REVERSE_YEAR_MAP[yearFilter];
+    }
+
+    // Fetch filtered classes
+    const classes = await Class.find(classQuery).lean();
+
+    // Fetch Attendance
     const attendance = await Attendance.find(dateQuery).lean();
 
     /* ================= BUILD COLUMNS ================= */
@@ -163,8 +180,10 @@ export async function GET(req) {
 
                 row.data[col] = cell;
 
-                totalP += cell.P;
-                totalCapacity += records.length * matchedClasses[0].totalStudents;
+                if (cell.P !== "-") {
+                    totalP += cell.P;
+                    totalCapacity += records.length * matchedClasses[0].totalStudents;
+                }
             });
 
             row.data["TOTAL"] = {
@@ -174,19 +193,23 @@ export async function GET(req) {
                     : 0
             };
 
-            rows.push(row);
+            // Only push row if it has relevant columns (handled by the loop) or if you want to filter empty rows
+            if (columns.length > 0) {
+                rows.push(row);
+            }
         });
     });
 
-    /* ================= RESPONSE ================= */
     return NextResponse.json({
         success: true,
         filters: {
             department: departmentFilter,
+            year: yearFilter, // Return the applied filter
             period,
             startDate,
             endDate
         },
+        departments: alldepartments,
         columns: [...columns, "TOTAL"],
         subColumns: ["P", "%"],
         rows

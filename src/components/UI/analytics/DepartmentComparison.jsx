@@ -1,9 +1,17 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 const DepartmentComparison = ({ data, availableDepartments }) => {
-  const [selectedDeptA, setSelectedDeptA] = useState(data?.deptA?.name || "");
-  const [selectedDeptB, setSelectedDeptB] = useState(data?.deptB?.name || "");
+  // Initialize state based on API data structure (left/right)
+  // Note: We use 'department' instead of 'name' based on your API
+  const [selectedDeptA, setSelectedDeptA] = useState(data?.left?.department || "");
+  const [selectedDeptB, setSelectedDeptB] = useState(data?.right?.department || "");
+
+  // Update state if data prop changes
+  useEffect(() => {
+    if (data?.left?.department) setSelectedDeptA(data.left.department);
+    if (data?.right?.department) setSelectedDeptB(data.right.department);
+  }, [data]);
 
   const colorA = "text-blue-600";
   const colorB = "text-green-600";
@@ -58,15 +66,15 @@ const DepartmentComparison = ({ data, availableDepartments }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-        {/* ================= DEPARTMENT A ================= */}
+        {/* ================= DEPARTMENT A (LEFT) ================= */}
         <div className={`p-6 rounded-xl border-t-8 ${borderA} ${bgColorA}`}>
           <h2 className={`text-2xl font-black mb-6 ${colorA}`}>
-            {data?.deptA?.name || "—"}
+            {data?.left?.department || "—"}
           </h2>
 
           <MetricCard
             title="Overall Attendance"
-            value={`${data?.deptA?.overall?.attendance ?? 0}%`}
+            value={`${data?.left?.overall?.attendance ?? 0}%`}
             colorClass={colorA}
             size="text-4xl"
           />
@@ -74,63 +82,66 @@ const DepartmentComparison = ({ data, availableDepartments }) => {
           <div className="grid grid-cols-3 gap-3">
             <MetricCard
               title="Morning"
-              value={`${data?.deptA?.overall?.morning ?? 0}%`}
+              value={`${data?.left?.overall?.morning ?? 0}%`}
+              size="text-xl"
             />
             <MetricCard
               title="Afternoon"
-              value={`${data?.deptA?.overall?.afternoon ?? 0}%`}
+              value={`${data?.left?.overall?.afternoon ?? 0}%`}
+              size="text-xl"
             />
             <MetricCard
               title="Events"
-              value={data?.deptA?.overall?.totalEvents ?? 0}
+              value={data?.left?.overall?.totalEvents ?? 0}
+              size="text-xl"
             />
           </div>
 
           <MetricCard
             title="Today's Attendance"
-            value={`${data?.deptA?.today?.attendance ?? 0}%`}
+            value={`${data?.left?.today?.attendance ?? 0}%`}
           />
 
           <MetricCard
             title="Monthly Attendance"
-            value={`${data?.deptA?.month?.attendance ?? 0}%`}
+            value={`${data?.left?.month?.attendance ?? 0}%`}
           />
 
           <MetricCard
             title="Total Classes"
-            value={data?.deptA?.totalClasses ?? 0}
+            value={data?.left?.totalClasses ?? 0}
           />
 
           <MetricCard
             title="Best Class"
             value={
-              data?.deptA?.bestClass
-                ? `${data.deptA.bestClass.className} (${data.deptA.bestClass.avg}%)`
+              data?.left?.bestClass
+                ? `${data.left.bestClass.className} (${data.left.bestClass.avg}%)`
                 : "—"
             }
           />
 
           <MetricCard
             title="Department Rank"
-            value={data?.deptA?.departmentRank ?? "—"}
+            value={data?.left?.departmentRank ?? "—"}
             colorClass={colorA}
           />
 
           <MetricCard
             title="Recent Event"
-            value={data?.deptA?.recentEvent?.name ?? "—"}
+            value={data?.left?.recentEvent?.name ?? "—"}
           />
         </div>
 
-        {/* ================= DEPARTMENT B ================= */}
+        {/* ================= DEPARTMENT B (RIGHT) ================= */}
         <div className={`p-6 rounded-xl border-t-8 ${borderB} ${bgColorB}`}>
           <h2 className={`text-2xl font-black mb-6 ${colorB}`}>
-            {data?.deptB?.name || "—"}
+            {data?.right?.department || "—"}
           </h2>
 
           <MetricCard
             title="Overall Attendance"
-            value={`${data?.deptB?.overall?.attendance ?? 0}%`}
+            value={`${data?.right?.overall?.attendance ?? 0}%`}
             colorClass={colorB}
             size="text-4xl"
           />
@@ -138,51 +149,54 @@ const DepartmentComparison = ({ data, availableDepartments }) => {
           <div className="grid grid-cols-3 gap-3">
             <MetricCard
               title="Morning"
-              value={`${data?.deptB?.overall?.morning ?? 0}%`}
+              value={`${data?.right?.overall?.morning ?? 0}%`}
+              size="text-xl"
             />
             <MetricCard
               title="Afternoon"
-              value={`${data?.deptB?.overall?.afternoon ?? 0}%`}
+              value={`${data?.right?.overall?.afternoon ?? 0}%`}
+              size="text-xl"
             />
             <MetricCard
               title="Events"
-              value={data?.deptB?.overall?.totalEvents ?? 0}
+              value={data?.right?.overall?.totalEvents ?? 0}
+              size="text-xl"
             />
           </div>
 
           <MetricCard
             title="Today's Attendance"
-            value={`${data?.deptB?.today?.attendance ?? 0}%`}
+            value={`${data?.right?.today?.attendance ?? 0}%`}
           />
 
           <MetricCard
             title="Monthly Attendance"
-            value={`${data?.deptB?.month?.attendance ?? 0}%`}
+            value={`${data?.right?.month?.attendance ?? 0}%`}
           />
 
           <MetricCard
             title="Total Classes"
-            value={data?.deptB?.totalClasses ?? 0}
+            value={data?.right?.totalClasses ?? 0}
           />
 
           <MetricCard
             title="Best Class"
             value={
-              data?.deptB?.bestClass
-                ? `${data.deptB.bestClass.className} (${data.deptB.bestClass.avg}%)`
+              data?.right?.bestClass
+                ? `${data.right.bestClass.className} (${data.right.bestClass.avg}%)`
                 : "—"
             }
           />
 
           <MetricCard
             title="Department Rank"
-            value={data?.deptB?.departmentRank ?? "—"}
+            value={data?.right?.departmentRank ?? "—"}
             colorClass={colorB}
           />
 
           <MetricCard
             title="Recent Event"
-            value={data?.deptB?.recentEvent?.name ?? "—"}
+            value={data?.right?.recentEvent?.name ?? "—"}
           />
         </div>
 

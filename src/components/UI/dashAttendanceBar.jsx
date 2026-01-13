@@ -1,56 +1,27 @@
 "use client";
-import React from "react";
+import React, { useRef, useState } from "react";
 import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    Tooltip,
-    Legend,
-    CartesianGrid,
-    Cell,
-    ResponsiveContainer,
-    LabelList, // 👈 Added LabelList
+    BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, ResponsiveContainer, LabelList,
 } from "recharts";
+import { Download, Loader2, FileBarChart } from "lucide-react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
-// --------------------------------------------------
-// 🎨 FIXED COLOR PALETTE (Supports unlimited departments)
-// --------------------------------------------------
+// 🎨 FIXED COLOR PALETTE
 const departmentColorPalette = [
-    "#1E90FF", // Blue
-    "#28A745", // Green
-    "#FF8C00", // Orange
-    "#8A2BE2", // Purple
-    "#DC143C", // Red
-    "#20B2AA", // Teal
-    "#FF1493", // Pink
-    "#6A5ACD", // Indigo
-    "#708090", // Slate
-    "#A0522D", // Brown
+    "#1E90FF", "#28A745", "#FF8C00", "#8A2BE2", "#DC143C",
+    "#20B2AA", "#FF1493", "#6A5ACD", "#708090", "#A0522D",
 ];
 
-// Utility to lighten colors (for morning shade)
 const lightenColor = (color, percent) => {
     const num = parseInt(color.replace("#", ""), 16);
     const amt = Math.round(2.55 * percent);
     const r = (num >> 16) + amt;
     const g = ((num >> 8) & 0x00ff) + amt;
     const b = (num & 0x0000ff) + amt;
-
-    return (
-        "#" +
-        (
-            0x1000000 +
-            (r < 255 ? (r < 1 ? 0 : r) : 255) * 0x10000 +
-            (g < 255 ? (g < 1 ? 0 : g) : 255) * 0x100 +
-            (b < 255 ? (b < 1 ? 0 : b) : 255)
-        )
-            .toString(16)
-            .slice(1)
-    );
+    return "#" + (0x1000000 + (r < 255 ? (r < 1 ? 0 : r) : 255) * 0x10000 + (g < 255 ? (g < 1 ? 0 : g) : 255) * 0x100 + (b < 255 ? (b < 1 ? 0 : b) : 255)).toString(16).slice(1);
 };
 
-// Assign consistent colors to departments
 const getDepartmentColors = (departments) => {
     const deptColorMap = {};
     departments.forEach((dept, index) => {
@@ -63,14 +34,11 @@ const getDepartmentColors = (departments) => {
     return deptColorMap;
 };
 
-// Custom Tooltip to show department
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
-        // Assuming the first payload item has the department property
         const department = payload[0].payload.department;
-
         return (
-            <div className="bg-white border rounded-lg shadow-md p-3 text-sm">
+            <div className="bg-white border rounded-lg shadow-md p-3 text-sm z-50">
                 <p className="font-bold text-gray-800">{label}</p>
                 <p className="text-gray-600 mb-1">Department: {department}</p>
                 {payload.map((entry) => (
@@ -84,212 +52,252 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
+export default function DepartmentBarChart({ data = [] }) {
+    const scrollContainerRef = useRef(null);
+    const chartContentRef = useRef(null);
+    const [isDownloading, setIsDownloading] = useState(false);
 
-export default function DepartmentBarChart() {
-    // 🔹 USE YOUR DATA EXACTLY AS GIVEN
-    const extendedDepartmentData = [
-        {
-            department: "Computer Science",
-            classes: [
-                { name: "CS101", overall: 89, morning: 91, afternoon: 88 },
-                { name: "CS102", overall: 85, morning: 84, afternoon: 86 },
-                { name: "CS201", overall: 92, morning: 93, afternoon: 90 },
-                { name: "CS202", overall: 87, morning: 88, afternoon: 85 },
-                { name: "CS301", overall: 94, morning: 95, afternoon: 93 },
-                { name: "CS302", overall: 90, morning: 92, afternoon: 89 },
-                { name: "CS401", overall: 88, morning: 86, afternoon: 89 },
-                { name: "CS402", overall: 91, morning: 91, afternoon: 91 },
-            ],
-        },
-        {
-            department: "Mechanical Engineering",
-            classes: [
-                { name: "ME101", overall: 78, morning: 79, afternoon: 76 },
-                { name: "ME202", overall: 82, morning: 83, afternoon: 81 },
-                { name: "ME301", overall: 85, morning: 87, afternoon: 84 },
-                { name: "ME302", overall: 79, morning: 80, afternoon: 77 },
-                { name: "ME401", overall: 88, morning: 89, afternoon: 86 },
-                { name: "ME402", overall: 84, morning: 85, afternoon: 83 },
-                { name: "ME501", overall: 81, morning: 82, afternoon: 79 },
-            ],
-        },
-        {
-            department: "Electrical Engineering",
-            classes: [
-                { name: "EE101", overall: 80, morning: 82, afternoon: 79 },
-                { name: "EE102", overall: 83, morning: 84, afternoon: 81 },
-                { name: "EE201", overall: 88, morning: 89, afternoon: 87 },
-                { name: "EE202", overall: 77, morning: 78, afternoon: 75 },
-                { name: "EE301", overall: 90, morning: 91, afternoon: 88 },
-                { name: "EE302", overall: 85, morning: 87, afternoon: 84 },
-                { name: "EE401", overall: 86, morning: 85, afternoon: 86 },
-                { name: "EE402", overall: 89, morning: 90, afternoon: 87 },
-                { name: "EE501", overall: 91, morning: 92, afternoon: 90 },
-                { name: "EE502", overall: 82, morning: 83, afternoon: 80 },
-            ],
-        },
-        {
-            department: "Civil Engineering",
-            classes: [
-                { name: "CE101", overall: 75, morning: 77, afternoon: 74 },
-                { name: "CE201", overall: 81, morning: 82, afternoon: 79 },
-                { name: "CE301", overall: 84, morning: 85, afternoon: 83 },
-                { name: "CE401", overall: 87, morning: 88, afternoon: 86 },
-                { name: "CE501", overall: 79, morning: 81, afternoon: 78 },
-            ],
-        },
-        {
-            department: "Physics",
-            classes: [
-                { name: "PHY101", overall: 90, morning: 91, afternoon: 89 },
-                { name: "PHY102", overall: 87, morning: 86, afternoon: 88 },
-                { name: "PHY201", overall: 93, morning: 94, afternoon: 92 },
-                { name: "PHY202", overall: 85, morning: 87, afternoon: 84 },
-                { name: "PHY301", overall: 91, morning: 92, afternoon: 90 },
-                { name: "PHY302", overall: 88, morning: 89, afternoon: 87 },
-            ],
-        },
-        {
-            department: "Chemistry",
-            classes: [
-                { name: "CHM101", overall: 84, morning: 86, afternoon: 83 },
-                { name: "CHM102", overall: 80, morning: 81, afternoon: 78 },
-                { name: "CHM201", overall: 87, morning: 88, afternoon: 86 },
-                { name: "CHM202", overall: 91, morning: 92, afternoon: 90 },
-                { name: "CHM301", overall: 85, morning: 86, afternoon: 84 },
-                { name: "CHM302", overall: 78, morning: 79, afternoon: 77 },
-                { name: "CHM401", overall: 82, morning: 83, afternoon: 80 },
-                { name: "CHM402", overall: 89, morning: 90, afternoon: 87 },
-                { name: "CHM501", overall: 86, morning: 87, afternoon: 85 },
-            ],
-        },
-        {
-            department: "Mathematics",
-            classes: [
-                { name: "MTH101", overall: 85, morning: 87, afternoon: 84 },
-                { name: "MTH102", overall: 88, morning: 89, afternoon: 86 },
-                { name: "MTH201", overall: 92, morning: 93, afternoon: 91 },
-                { name: "MTH202", overall: 80, morning: 81, afternoon: 79 },
-                { name: "MTH301", overall: 94, morning: 95, afternoon: 93 },
-                { name: "MTH302", overall: 83, morning: 84, afternoon: 82 },
-                { name: "MTH401", overall: 87, morning: 88, afternoon: 85 },
-                { name: "MTH402", overall: 90, morning: 91, afternoon: 89 },
-            ],
-        },
-    ];
+    const formattedData = data.map(item => ({
+        name: item.className,
+        department: item.department || "Unknown",
+        morning: parseFloat(item.morningPercent),
+        afternoon: parseFloat(item.afternoonPercent)
+    }));
 
-    // Flatten the data
-    const flatData = extendedDepartmentData.flatMap((dept) =>
-        dept.classes.map((cls) => ({
-            ...cls,
-            department: dept.department,
-        }))
-    );
-
-    // Collect department names
-    const deptNames = extendedDepartmentData.map((d) => d.department);
+    const deptNames = [...new Set(formattedData.map(d => d.department))];
     const deptColorMap = getDepartmentColors(deptNames);
 
-    // 🔥 Dynamic width logic for scrollable chart
-    // Base width: 900px, plus 45px per data point for two bars (morning/afternoon)
-    const dynamicWidth = Math.max(900, flatData.length * 45);
+    // Dynamic Width Calculation
+    const dynamicWidth = Math.max(1000, formattedData.length * 80);
+
+    // --- PDF EXPORT FUNCTION ---
+    const handleDownloadPDF = async () => {
+        if (!scrollContainerRef.current || !chartContentRef.current) return;
+        setIsDownloading(true);
+
+        try {
+            const scrollContainer = scrollContainerRef.current;
+            const originalOverflow = scrollContainer.style.overflow;
+
+            // 1. Temporarily expand scroll container
+            scrollContainer.style.overflow = "visible";
+            scrollContainer.style.width = "fit-content";
+
+            // Wait for DOM to repaint
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // 2. Generate Canvas
+            const canvas = await html2canvas(chartContentRef.current, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: "#ffffff",
+                width: dynamicWidth,
+                windowWidth: dynamicWidth,
+
+                onclone: (documentClone) => {
+                    // Fix Scroll in clone
+                    const clonedScroll = documentClone.getElementById('chart-scroll-container');
+                    const clonedInner = documentClone.getElementById('chart-inner-container');
+                    if (clonedScroll && clonedInner) {
+                        clonedScroll.style.overflow = 'visible';
+                        clonedScroll.style.width = 'auto';
+                        clonedInner.style.width = `${dynamicWidth}px`;
+                    }
+
+                    // Remove Tooltips
+                    const tooltips = documentClone.querySelectorAll('.recharts-tooltip-wrapper');
+                    tooltips.forEach(el => el.remove());
+
+                    // Force HEX colors to fix "lab" error
+                    if (clonedInner) {
+                        clonedInner.style.color = '#374151';
+                        clonedInner.style.borderColor = '#e5e7eb';
+                    }
+                }
+            });
+
+            // 3. Restore UI
+            scrollContainer.style.overflow = originalOverflow;
+            scrollContainer.style.width = "100%";
+
+            // 4. Generate PDF
+            const imgData = canvas.toDataURL("image/png");
+            const pdf = new jsPDF('l', 'mm', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+
+            const margin = 10;
+            const maxImgWidth = pageWidth - (margin * 2);
+            const maxImgHeight = pageHeight - (margin * 2);
+
+            const imgRatio = canvas.width / canvas.height;
+            let finalWidth = maxImgWidth;
+            let finalHeight = finalWidth / imgRatio;
+
+            if (finalHeight > maxImgHeight) {
+                finalHeight = maxImgHeight;
+                finalWidth = finalHeight * imgRatio;
+            }
+
+            pdf.setFontSize(14);
+            pdf.text("Department Attendance Report", margin, margin + 5);
+
+            // Center the image
+            const xPos = (pageWidth - finalWidth) / 2;
+            pdf.addImage(imgData, 'PNG', xPos, margin + 15, finalWidth, finalHeight);
+
+            pdf.save("attendance_chart.pdf");
+
+        } catch (error) {
+            console.error("PDF Export failed", error);
+            alert("Export failed. Please check console.");
+        } finally {
+            if (scrollContainerRef.current) {
+                scrollContainerRef.current.style.overflow = "auto";
+                scrollContainerRef.current.style.width = "100%";
+            }
+            setIsDownloading(false);
+        }
+    };
+
+    if (formattedData.length === 0) {
+        return (
+            <div className="p-12 text-center bg-white rounded-xl border border-gray-100 shadow-sm">
+                <FileBarChart className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+                <p className="text-gray-500 font-medium">No attendance data available.</p>
+            </div>
+        );
+    }
 
     return (
-        <div className="w-full h-[650px] bg-white p-4 rounded-xl shadow overflow-hidden">
-            <h2 className="text-xl font-semibold mb-4">Department Attendance by Class and Shift</h2>
+        <div className="w-full bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                <div>
+                    <h2 className="text-xl font-bold text-gray-800">Attendance Overview</h2>
+                    <p className="text-sm text-gray-500">Compare morning vs afternoon performance</p>
+                </div>
+                <button
+                    onClick={handleDownloadPDF}
+                    disabled={isDownloading}
+                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-md hover:shadow-lg disabled:opacity-50"
+                >
+                    {isDownloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                    {isDownloading ? "Generating PDF..." : "Export Chart"}
+                </button>
+            </div>
 
-            {/* Scrollable Chart Container */}
-            <div className="w-full overflow-x-auto hide-scrollbar" style={{ height: "480px" }}>
-                <div style={{ minWidth: dynamicWidth, height: "100%" }}>
+            <div
+                ref={scrollContainerRef}
+                id="chart-scroll-container"
+                className="w-full overflow-x-auto custom-scrollbar hide-scrollbar pb-6 "
+            >
+                <div
+                    ref={chartContentRef}
+                    id="chart-inner-container"
+                    style={{
+                        minWidth: dynamicWidth,
+                        height: "550px",
+                        backgroundColor: '#ffffff',
+                        color: '#000000',
+                        fontFamily: 'sans-serif'
+                    }}
+                >
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart
-                            data={flatData}
-                            barGap={10}
-                            margin={{ top: 20, right: 30, left: 20, bottom: 80 }} // Increased top margin for labels
+                            data={formattedData}
+                            barGap={12}
+                            // INCREASED TOP MARGIN (from 30 to 50) so Labels don't get cut off
+                            margin={{ top: 50, right: 30, left: 20, bottom: 60 }}
                             barCategoryGap="25%"
                         >
-                            <CartesianGrid strokeDasharray="3 3" />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                             <XAxis
                                 dataKey="name"
                                 interval={0}
-                                angle={-45}
-                                textAnchor="end"
-                                height={90}
-                                tick={{ fontSize: 11 }}
+                                angle={0}
+                                dy={10}
+                                tick={{ fontSize: 12, fill: '#4b5563', fontWeight: 600 }}
+                                axisLine={{ stroke: '#e5e7eb' }}
                             />
                             <YAxis
                                 domain={[0, 100]}
                                 tickFormatter={(v) => `${v}%`}
-                                tick={{ fontSize: 12 }}
+                                tick={{ fontSize: 12, fill: '#9ca3af' }}
+                                axisLine={false}
+                                tickLine={false}
                             />
-                            <Tooltip content={<CustomTooltip />} />
+                            <Tooltip cursor={{ fill: '#f9fafb' }} content={<CustomTooltip />} />
 
-                            {/* MORNING (light shade) */}
-                            <Bar dataKey="morning" name="Morning" radius={[5, 5, 0, 0]} barSize={26}>
-                                {flatData.map((entry, i) => (
-                                    <Cell
-                                        key={`morning-cell-${i}`}
-                                        fill={deptColorMap[entry.department].morning}
-                                    />
+                            {/* ❗ CRITICAL: isAnimationActive={false} 
+                                This ensures bars (and labels) render instantly for the screenshot. 
+                            */}
+
+                            {/* Morning Bar */}
+                            <Bar
+                                dataKey="morning"
+                                name="Morning"
+                                radius={[6, 6, 0, 0]}
+                                barSize={45}
+                                isAnimationActive={false}
+                            >
+                                {formattedData.map((entry, i) => (
+                                    <Cell key={`morning-cell-${i}`} fill={deptColorMap[entry.department]?.morning || "#ccc"} />
                                 ))}
-
                                 <LabelList
                                     dataKey="morning"
-                                    position="top"
-                                    offset={8}
+                                    position="insideTop"
+                                    offset={10}
                                     formatter={(v) => `${v}%`}
-                                    style={{ fill: "#000000", fontWeight: "bold" }}  // 🔥 Black text
+                                    style={{ fill: "#FFFFFF", fontWeight: "800", fontSize: 11 }}
                                 />
-
                             </Bar>
 
-
-                            <Bar dataKey="afternoon" name="Afternoon" radius={[5, 5, 0, 0]} barSize={26}>
-                                {flatData.map((entry, i) => (
-                                    <Cell
-                                        key={`afternoon-cell-${i}`}
-                                        fill={deptColorMap[entry.department].afternoon}
-                                    />
+                            {/* Afternoon Bar */}
+                            <Bar
+                                dataKey="afternoon"
+                                name="Afternoon"
+                                radius={[6, 6, 0, 0]}
+                                barSize={45}
+                                isAnimationActive={false}
+                            >
+                                {formattedData.map((entry, i) => (
+                                    <Cell key={`afternoon-cell-${i}`} fill={deptColorMap[entry.department]?.afternoon || "#888"} />
                                 ))}
-
                                 <LabelList
                                     dataKey="afternoon"
                                     position="top"
-                                    offset={8}
+                                    offset={5}
                                     formatter={(v) => `${v}%`}
-                                    style={{ fill: "#ff0000", fontWeight: "bold" }}  // 🔥 Grey text
+                                    style={{ fill: "#1f2937", fontWeight: "800", fontSize: 11 }}
                                 />
-
                             </Bar>
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
             </div>
 
-            <hr className="my-4" />
+            <div className="border-t border-gray-100 my-6"></div>
 
-            {/* LEGEND FOR DEPARTMENTS */}
-            <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3 justify-center">
-                <span className="font-bold w-full text-center text-sm mb-2">Department Color Key:</span>
-                {deptNames.map((dept) => (
-                    <div key={dept} className="flex items-center gap-2">
-                        <div
-                            className="w-4 h-4 rounded shadow-md"
-                            style={{
-                                // Use the dark shade as the primary department color in the legend
-                                backgroundColor: deptColorMap[dept].afternoon,
-                            }}
-                        ></div>
-                        <span className="text-sm">{dept}</span>
+            <div className="space-y-4">
+                <div className="flex justify-center items-center gap-6 text-sm font-medium">
+                    <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded-md bg-gray-300 opacity-60"></div>
+                        <span className="text-gray-600">Morning Shift (Light)</span>
                     </div>
-                ))}
-            </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded-md bg-gray-600"></div>
+                        <span className="text-gray-600">Afternoon Shift (Dark)</span>
+                    </div>
+                </div>
 
-            {/* Legend for Shift */}
-            <div className="mt-4 text-center text-sm text-gray-600">
-                <span className="font-bold">Shift Key:</span>
-                <span className="ml-2" style={{ color: "#777" }}>&#9632; Light Bar = Morning</span>
-                <span className="ml-4" style={{ color: "#333" }}>&#9632; Dark Bar = Afternoon</span>
+                <div className="flex flex-wrap gap-x-6 gap-y-3 justify-center pt-2">
+                    {deptNames.map((dept) => (
+                        <div key={dept} className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100 transition-colors hover:border-gray-300">
+                            <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: deptColorMap[dept]?.afternoon }}></div>
+                            <span className="text-xs font-bold text-gray-700">{dept}</span>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );

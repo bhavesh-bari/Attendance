@@ -3,14 +3,14 @@ import { connectDB } from "@/lib/mongodb";
 import Attendance from "@/models/Attendance";
 import Class from "@/models/Class";
 
-export async function GET(req) {
+export async function GET() {
     try {
         await connectDB();
 
-        const { searchParams } = new URL(req.url);
-        const dateParam = searchParams.get("date") || new Date();
-
-        const today = new Date(dateParam);
+        /* ===============================
+           Dates (AUTO – no filters)
+        =============================== */
+        const today = new Date();
         today.setHours(0, 0, 0, 0);
 
         const yesterday = new Date(today);
@@ -18,6 +18,9 @@ export async function GET(req) {
 
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
+        /* ===============================
+           Class Map
+        =============================== */
         const classes = await Class.find();
         const classMap = {};
         classes.forEach(c => {
@@ -33,34 +36,30 @@ export async function GET(req) {
         };
 
         /* ===============================
-           Today Attendance
+           TODAY Attendance
         =============================== */
         const todayData = await Attendance.find({ date: today });
         const yesterdayData = await Attendance.find({ date: yesterday });
 
-        const todayPercents = todayData.map(d =>
-            calcPercent(d, classMap[d.classId]?.totalStudents)
-        );
-
-        const yesterdayPercents = yesterdayData.map(d =>
-            calcPercent(d, classMap[d.classId]?.totalStudents)
-        );
-
         const todayAvg =
-            todayPercents.reduce((a, b) => a + b, 0) / (todayPercents.length || 1);
+            todayData.reduce((sum, d) =>
+                sum + calcPercent(d, classMap[d.classId]?.totalStudents), 0
+            ) / (todayData.length || 1);
 
         const yesterdayAvg =
-            yesterdayPercents.reduce((a, b) => a + b, 0) /
-            (yesterdayPercents.length || 1);
+            yesterdayData.reduce((sum, d) =>
+                sum + calcPercent(d, classMap[d.classId]?.totalStudents), 0
+            ) / (yesterdayData.length || 1);
 
         /* ===============================
-           Best & Lowest Class
+           Best & Lowest (TODAY)
         =============================== */
         let bestClass = null;
         let worstClass = null;
 
         todayData.forEach(d => {
             const percent = calcPercent(d, classMap[d.classId]?.totalStudents);
+
             if (!bestClass || percent > bestClass.percent)
                 bestClass = { ...d.toObject(), percent };
 
@@ -69,22 +68,19 @@ export async function GET(req) {
         });
 
         /* ===============================
-           Monthly Average
+           MONTHLY DATA (Current Month)
         =============================== */
         const monthData = await Attendance.find({
             date: { $gte: monthStart, $lte: today }
         });
 
-        const monthPercents = monthData.map(d =>
-            calcPercent(d, classMap[d.classId]?.totalStudents)
-        );
-
         const monthlyAvg =
-            monthPercents.reduce((a, b) => a + b, 0) /
-            (monthPercents.length || 1);
+            monthData.reduce((sum, d) =>
+                sum + calcPercent(d, classMap[d.classId]?.totalStudents), 0
+            ) / (monthData.length || 1);
 
         /* ===============================
-           Upcoming Event
+           UPCOMING EVENT
         =============================== */
         const upcomingEvent = await Attendance.findOne({
             date: { $gt: today },
@@ -92,9 +88,10 @@ export async function GET(req) {
         }).sort({ date: 1 });
 
         /* ===============================
-           Most Events (Dept)
+           MOST EVENTS (THIS MONTH)
         =============================== */
         const eventCounts = {};
+
         monthData.forEach(d => {
             if (d.isEvent) {
                 const dept = classMap[d.classId]?.department;
@@ -107,7 +104,7 @@ export async function GET(req) {
         )[0];
 
         /* ===============================
-           Final Response
+           FINAL RESPONSE
         =============================== */
         return NextResponse.json({
             success: true,
@@ -135,6 +132,7 @@ export async function GET(req) {
                 }
             }
         });
+
     } catch (error) {
         return NextResponse.json(
             { success: false, error: error.message },

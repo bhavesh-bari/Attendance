@@ -8,8 +8,8 @@ const DURATION = 'duration-300';
 
 const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: Home },
-    { name: "Fill Forms", href: "/fill", icon: BookOpen },
-    { name: "Edit Data", href: "/edit", icon: Users },
+    { name: "Attendance Fill", href: "/fill", icon: BookOpen },
+    { name: "Classes Mangemnet", href: "/edit", icon: Users },
     { name: "Table", href: "/table", icon: Table },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
 ];
@@ -17,8 +17,8 @@ const Sidebar = ({ isSidebarOpen, toggleSidebar }) => {
     const sidebarWidthClass = isSidebarOpen ? SIDEBAR_WIDTH_FULL : SIDEBAR_WIDTH_COLLAPSED;
 
     return (
-       <aside
-  className={`
+        <aside
+            className={`
     fixed top-16 bottom-0 left-0 z-50 
     flex flex-col shadow-2xl
     transition-all ${DURATION} ease-in-out

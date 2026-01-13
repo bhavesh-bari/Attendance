@@ -1,115 +1,184 @@
 "use client";
 import React, { useState, useEffect } from "react";
 
-/* ===========================================================
-   DUMMY DEPARTMENT DATA (UPDATED)
-   =========================================================== */
+const ClassComparison = ({ data, availableClasses }) => {
+  // Initialize state based on the API response structure
+  const [selectedClassA, setSelectedClassA] = useState(data?.left?.className || "");
+  const [selectedClassB, setSelectedClassB] = useState(data?.right?.className || "");
 
-export const DEPARTMENT_DUMMY_DATA = {
-  "Mechanical Engineering (ME)": {
-    classes: [
-      { name: "ME FE A", overall_attendance: 78, morning: 80, afternoon: 76, eventsAttended: 3 },
-      { name: "ME FE B", overall_attendance: 82, morning: 85, afternoon: 79, eventsAttended: 2 },
-      { name: "ME SE A", overall_attendance: 75, morning: 77, afternoon: 73, eventsAttended: 4 },
-      { name: "ME SE B", overall_attendance: 79, morning: 82, afternoon: 76, eventsAttended: 3 },
-
-      {
-        name: "ME TE",
-        overall_attendance: 88,
-        morning: 90,
-        afternoon: 86,
-        eventsAttended: 5,
-
-        today: {
-          attendance: "0.0",
-          morning: "0.0",
-          totalEvents: 0,
-        },
-
-        month: {
-          attendance: "86.3",
-          morning: "85.4",
-          totalEvents: 3,
-        },
-
-        recentEvent: {
-          name: "Meeting",
-          date: "2026-01-09T18:30:00.000Z",
-        },
-      },
-    ],
-  },
-};
-
-/* ===========================================================
-   METRIC CARD
-   =========================================================== */
-
-const MetricCard = ({ title, value, colorClass = "text-gray-900" }) => (
-  <div className="p-4 bg-white rounded-lg shadow border">
-    <p className="text-sm text-gray-500">{title}</p>
-    <p className={`text-2xl font-bold ${colorClass}`}>{value}</p>
-  </div>
-);
-
-/* ===========================================================
-   MAIN COMPONENT
-   =========================================================== */
-
-export default function ClassComparison({ department }) {
-  const selectedDept = department || "Mechanical Engineering (ME)";
-  const deptClasses = DEPARTMENT_DUMMY_DATA[selectedDept]?.classes || [];
-
-  const [selectedClassA, setSelectedClassA] = useState("");
-  const [selectedClassB, setSelectedClassB] = useState("");
-
+  // Update state if new data comes in
   useEffect(() => {
-    if (deptClasses.length > 1) {
-      setSelectedClassA(deptClasses[0].name);
-      setSelectedClassB(deptClasses[1].name);
-    }
-  }, [selectedDept]);
+    if (data?.left?.className) setSelectedClassA(data.left.className);
+    if (data?.right?.className) setSelectedClassB(data.right.className);
+  }, [data]);
 
-  const classAData = deptClasses.find((c) => c.name === selectedClassA);
-  const classBData = deptClasses.find((c) => c.name === selectedClassB);
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-      {/* CLASS A */}
-      <div className="p-6 bg-blue-50 rounded-xl">
-        <h2 className="text-xl font-bold text-blue-600 mb-4">{selectedClassA}</h2>
-
-        <div className="space-y-3">
-          <MetricCard title="Overall Attendance" value={`${classAData?.overall_attendance ?? 0}%`} colorClass="text-blue-600" />
-          <MetricCard title="Morning" value={`${classAData?.morning ?? 0}%`} />
-          <MetricCard title="Afternoon" value={`${classAData?.afternoon ?? 0}%`} />
-          <MetricCard title="Events Attended" value={classAData?.eventsAttended ?? 0} />
-
-          <MetricCard title="Today's Attendance" value={`${classAData?.today?.attendance ?? 0}%`} />
-          <MetricCard title="Monthly Attendance" value={`${classAData?.month?.attendance ?? 0}%`} />
-          <MetricCard title="Monthly Events" value={classAData?.month?.totalEvents ?? 0} />
-          <MetricCard title="Recent Event" value={classAData?.recentEvent?.name ?? "—"} />
-        </div>
-      </div>
-
-      {/* CLASS B */}
-      <div className="p-6 bg-green-50 rounded-xl">
-        <h2 className="text-xl font-bold text-green-600 mb-4">{selectedClassB}</h2>
-
-        <div className="space-y-3">
-          <MetricCard title="Overall Attendance" value={`${classBData?.overall_attendance ?? 0}%`} colorClass="text-green-600" />
-          <MetricCard title="Morning" value={`${classBData?.morning ?? 0}%`} />
-          <MetricCard title="Afternoon" value={`${classBData?.afternoon ?? 0}%`} />
-          <MetricCard title="Events Attended" value={classBData?.eventsAttended ?? 0} />
-
-          <MetricCard title="Today's Attendance" value={`${classBData?.today?.attendance ?? 0}%`} />
-          <MetricCard title="Monthly Attendance" value={`${classBData?.month?.attendance ?? 0}%`} />
-          <MetricCard title="Monthly Events" value={classBData?.month?.totalEvents ?? 0} />
-          <MetricCard title="Recent Event" value={classBData?.recentEvent?.name ?? "—"} />
-        </div>
-      </div>
-
+  const MetricCard = ({
+    title,
+    value,
+    colorClass = "text-gray-900",
+    size = "text-2xl"
+  }) => (
+    <div className="p-4 bg-white rounded-lg shadow border">
+      <p className="text-sm text-gray-500 truncate">{title}</p>
+      <p className={`${size} font-bold ${colorClass}`}>{value}</p>
     </div>
   );
-}
+
+  return (
+    <div className="mx-auto p-6 bg-gray-50 rounded-xl shadow-2xl">
+
+      {/* SELECTION DROPDOWNS */}
+      <div className="flex justify-between mb-6 gap-4">
+        <select
+          value={selectedClassA}
+          onChange={(e) => setSelectedClassA(e.target.value)}
+          className="p-2 border rounded-lg w-full md:w-auto"
+        >
+          {availableClasses?.map((c) => (
+            <option key={c.id} value={c.name}>{c.name}</option>
+          ))}
+        </select>
+
+        <select
+          value={selectedClassB}
+          onChange={(e) => setSelectedClassB(e.target.value)}
+          className="p-2 border rounded-lg w-full md:w-auto"
+        >
+          {availableClasses?.map((c) => (
+            <option key={c.id} value={c.name}>{c.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        {/* ================= CLASS A (LEFT) ================= */}
+        <div className="p-6 bg-blue-50 rounded-xl border-t-8 border-blue-500">
+          <h2 className="text-2xl font-black text-blue-600 mb-6">
+            {data?.left?.className || "—"}
+            <span className="text-sm font-normal text-gray-500 ml-2">
+              ({data?.left?.department})
+            </span>
+          </h2>
+
+          <div className="space-y-3">
+            <MetricCard
+              title="Overall Attendance"
+              value={`${data?.left?.overall?.attendance ?? 0}%`}
+              colorClass="text-blue-600"
+              size="text-4xl"
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <MetricCard
+                title="Morning"
+                value={`${data?.left?.overall?.morning ?? 0}%`}
+              />
+              <MetricCard
+                title="Afternoon"
+                value={`${data?.left?.overall?.afternoon ?? 0}%`}
+              />
+            </div>
+
+            <MetricCard
+              title="Total Events Attended"
+              value={data?.left?.overall?.totalEvents ?? 0}
+            />
+
+            <MetricCard
+              title="Today's Attendance"
+              value={`${data?.left?.today?.attendance ?? 0}%`}
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <MetricCard
+                title="Monthly Attendance"
+                value={`${data?.left?.month?.attendance ?? 0}%`}
+              />
+              <MetricCard
+                title="Monthly Events"
+                value={data?.left?.month?.totalEvents ?? 0}
+              />
+            </div>
+
+            <MetricCard
+              title="Rank in Dept"
+              value={data?.left?.rankInDepartment ?? "—"}
+              colorClass="text-blue-600"
+            />
+
+            <MetricCard
+              title="Recent Event"
+              value={data?.left?.recentEvent?.name ?? "—"}
+            />
+          </div>
+        </div>
+
+        {/* ================= CLASS B (RIGHT) ================= */}
+        <div className="p-6 bg-green-50 rounded-xl border-t-8 border-green-500">
+          <h2 className="text-2xl font-black text-green-600 mb-6">
+            {data?.right?.className || "—"}
+            <span className="text-sm font-normal text-gray-500 ml-2">
+              ({data?.right?.department})
+            </span>
+          </h2>
+
+          <div className="space-y-3">
+            <MetricCard
+              title="Overall Attendance"
+              value={`${data?.right?.overall?.attendance ?? 0}%`}
+              colorClass="text-green-600"
+              size="text-4xl"
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <MetricCard
+                title="Morning"
+                value={`${data?.right?.overall?.morning ?? 0}%`}
+              />
+              <MetricCard
+                title="Afternoon"
+                value={`${data?.right?.overall?.afternoon ?? 0}%`}
+              />
+            </div>
+
+            <MetricCard
+              title="Total Events Attended"
+              value={data?.right?.overall?.totalEvents ?? 0}
+            />
+
+            <MetricCard
+              title="Today's Attendance"
+              value={`${data?.right?.today?.attendance ?? 0}%`}
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <MetricCard
+                title="Monthly Attendance"
+                value={`${data?.right?.month?.attendance ?? 0}%`}
+              />
+              <MetricCard
+                title="Monthly Events"
+                value={data?.right?.month?.totalEvents ?? 0}
+              />
+            </div>
+
+            <MetricCard
+              title="Rank in Dept"
+              value={data?.right?.rankInDepartment ?? "—"}
+              colorClass="text-green-600"
+            />
+
+            <MetricCard
+              title="Recent Event"
+              value={data?.right?.recentEvent?.name ?? "—"}
+            />
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+export default ClassComparison;

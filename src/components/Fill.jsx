@@ -1,279 +1,485 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     Sun,
     Moon,
-    Users,
-    Edit2,
     Save,
-    CalendarDays,
+    Building2,
+    Calendar,
+    Users,
+    CheckCircle2,
+    Clock,
+    History,
+    LayoutDashboard,
+    Loader2,
+    ChevronRight,
+    AlertCircle // Imported for error display
 } from "lucide-react";
 
-/* ---------------- MOCK DATA (Replace with API later) ---------------- */
+/* ---------------- HELPER COMPONENTS ---------------- */
 
-const classesList = [
-    { id: 1, dept: "CSE", year: "3rd Year", div: "A", totalStudents: 60 },
-    { id: 2, dept: "ECE", year: "2nd Year", div: "B", totalStudents: 55 },
-];
+// Updated to accept error prop
+const InputGroup = ({ label, icon: Icon, children, error, className = "" }) => (
+    <div className={`space-y-1.5 ${className}`}>
+        <div className="flex justify-between items-center">
+            <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                {Icon && <Icon size={14} />}
+                {label}
+            </label>
+            {/* Show error message if exists */}
+            {error && (
+                <span className="text-xs text-red-500 font-medium flex items-center gap-1 animate-pulse">
+                    <AlertCircle size={12} /> {error}
+                </span>
+            )}
+        </div>
+        {children}
+    </div>
+);
 
 /* ---------------- MAIN COMPONENT ---------------- */
 
 const AttendanceComponent = () => {
+    // State
+    const [department, setDepartment] = useState("all");
+    const [classes, setClasses] = useState([]);
     const [records, setRecords] = useState([]);
-    const [editingId, setEditingId] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
 
+    /* --- NEW: Validation States --- */
+    const [selectedClassLimit, setSelectedClassLimit] = useState(0); // Stores totalStudents
+    const [errors, setErrors] = useState({}); // Stores validation errors
+
+    // Form State
     const [form, setForm] = useState({
-        date: "",
         classId: "",
-        morningCount: "",
-        morningEvent: "",
-        afternoonCount: "",
-        afternoonEvent: "",
+        className: "",
+        MornCount: "",
+        MEventName: "",
+        AftCount: "",
+        AEventName: "",
     });
+
+    // Current Date Formatter
+    const todayDate = new Date().toLocaleDateString("en-US", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+    });
+
+    /* ---------------- FETCH DATA ---------------- */
+
+    const fetchClasses = async () => {
+        try {
+            const res = await fetch("/api/attendance/getclasses", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ department }),
+            });
+            const data = await res.json();
+            // Assuming data.classes contains [{ _id, name, department, totalStudents }, ...]
+            if (data.success) setClasses(data.classes);
+        } catch (error) {
+            console.error("Failed to fetch classes");
+        }
+    };
+
+    const fetchToday = async () => {
+        setIsLoading(true);
+        try {
+            const res = await fetch("/api/attendance/getattendance", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ department }),
+            });
+            const data = await res.json();
+            if (data.success) setRecords(data.attendances);
+        } catch (error) {
+            console.error("Failed to fetch attendance");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchClasses();
+        fetchToday();
+    }, [department]);
 
     /* ---------------- HANDLERS ---------------- */
 
+    /* --- UPDATED: Validation Logic inside handleChange --- */
     const handleChange = (e) => {
         const { name, value } = e.target;
+
+        // 1. Update form state immediately
         setForm((prev) => ({ ...prev, [name]: value }));
+
+        // 2. Perform Validation if the field is a count
+        if (name === "MornCount" || name === "AftCount") {
+            const numValue = Number(value);
+
+            // If class is selected and value exceeds limit
+            if (selectedClassLimit > 0 && numValue > selectedClassLimit) {
+                setErrors(prev => ({
+                    ...prev,
+                    [name]: `Exceeds total students (${selectedClassLimit})`
+                }));
+            } else {
+                // Clear error if valid
+                setErrors(prev => {
+                    const newErrors = { ...prev };
+                    delete newErrors[name];
+                    return newErrors;
+                });
+            }
+        }
     };
 
-    const handleSubmit = (e) => {
+    /* --- UPDATED: Capture totalStudents on Class Change --- */
+    const handleClassChange = (e) => {
+        const cls = classes.find((c) => c._id === e.target.value);
+        if (cls) {
+            setForm((prev) => ({
+                ...prev,
+                classId: cls._id,
+                className: cls.name,
+                // Optional: Reset counts when class changes to avoid stale validation
+                MornCount: "",
+                AftCount: ""
+            }));
+
+            // Set the limit for validation
+            // IMPORTANT: Ensure your API returns 'totalStudents' key in the class object
+            setSelectedClassLimit(cls.totalStudents || 0);
+
+            // Clear previous errors
+            setErrors({});
+        } else {
+            setForm(prev => ({ ...prev, classId: "", className: "" }));
+            setSelectedClassLimit(0);
+            setErrors({});
+        }
+    };
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!form.classId || !form.date) return;
 
-        const cls = classesList.find(
-            (c) => c.id === Number(form.classId)
-        );
+        // Final Safety Check
+        if (Object.keys(errors).length > 0) return;
 
-        setRecords((prev) => [
-            ...prev,
-            {
-                id: Date.now(),
-                date: form.date,
-                className: `${cls.dept} ${cls.year} ${cls.div}`,
-                totalStudents: cls.totalStudents,
-                morning: {
-                    count: Number(form.morningCount || 0),
-                    event: form.morningEvent,
-                },
-                afternoon: {
-                    count: Number(form.afternoonCount || 0),
-                    event: form.afternoonEvent,
-                },
-            },
-        ]);
+        setIsSaving(true);
 
-        setForm({
-            date: "",
-            classId: "",
-            morningCount: "",
-            morningEvent: "",
-            afternoonCount: "",
-            afternoonEvent: "",
-        });
-    };
+        try {
+            await fetch("/api/attendance", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    ...form,
+                    department,
+                    date: new Date(),
+                    MornCount: Number(form.MornCount || 0),
+                    AftCount: Number(form.AftCount || 0),
+                }),
+            });
 
-    const handleSave = (id, updated) => {
-        setRecords((prev) =>
-            prev.map((r) => (r.id === id ? { ...r, ...updated } : r))
-        );
-        setEditingId(null);
+            setShowSuccess(true);
+            setTimeout(() => setShowSuccess(false), 3000);
+
+            setForm({
+                classId: "",
+                className: "",
+                MornCount: "",
+                MEventName: "",
+                AftCount: "",
+                AEventName: "",
+            });
+            setSelectedClassLimit(0); // Reset limit
+            setErrors({}); // Reset errors
+            fetchToday();
+        } catch (error) {
+            console.error("Error saving");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     /* ---------------- UI ---------------- */
 
     return (
-        <div className="min-h-screen bg-slate-100 p-6 ">
-            <div className="max-w-5xl mx-auto space-y-8">
+        <div className="min-h-screen bg-gray-50/50 p-4 md:p-8 text-gray-800 font-sans">
+            <div className="max-w-6xl mx-auto space-y-8">
 
-                {/* HEADER */}
-                <h1 className="text-4xl font-bold text-center text-slate-800">
-                    Daily Attendance Management
-                </h1>
+                {/* --- HEADER SECTION --- */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
+                            <LayoutDashboard className="text-indigo-600" />
+                            Daily Attendance
+                        </h1>
+                        <p className="text-gray-500 mt-1 flex items-center gap-2">
+                            <Calendar size={16} /> {todayDate}
+                        </p>
+                    </div>
 
-                {/* FORM */}
-                <form
-                    onSubmit={handleSubmit}
-                    className=" p-6 rounded-2xl shadow-lg space-y-6 "
-                >
-                    <h2 className="text-2xl font-semibold text-slate-700">
-                        Mark Attendance
-                    </h2>
+                    <div className="bg-white px-4 py-2 rounded-full shadow-sm border border-gray-200 flex items-center gap-4 text-sm font-medium">
+                        <span className="text-gray-500">Records Today:</span>
+                        <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md">{records.length}</span>
+                    </div>
+                </div>
 
-                    {/* DATE + CLASS */}
-                    <div className="grid md:grid-cols-2 gap-4">
-                        <div className="flex items-center gap-3">
-                            <CalendarDays className="text-indigo-600" />
-                            <input
-                                type="date"
-                                name="date"
-                                value={form.date}
-                                onChange={handleChange}
-                                className="w-full p-3 border rounded-lg"
-                                required
-                            />
-                        </div>
-
-                        <select
-                            name="classId"
-                            value={form.classId}
-                            onChange={handleChange}
-                            className="w-full p-3 border rounded-lg"
-                            required
+                {/* --- DEPARTMENT TABS --- */}
+                <div className="flex flex-wrap gap-2">
+                    {["all", "CSE", "ECE", "MECH"].map((dept) => (
+                        <button
+                            key={dept}
+                            onClick={() => setDepartment(dept)}
+                            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center gap-2
+                ${department === dept
+                                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-200 scale-105"
+                                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+                                }`}
                         >
-                            <option value="">Select Class</option>
-                            {classesList.map((cls) => (
-                                <option key={cls.id} value={cls.id}>
-                                    {cls.dept} {cls.year} {cls.div} (Total {cls.totalStudents})
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* MORNING & AFTERNOON */}
-                    <div className="grid md:grid-cols-2 gap-6">
-
-                        {/* MORNING */}
-                        <div className="bg-yellow-50 p-4 rounded-xl space-y-3">
-                            <div className="flex items-center gap-2 font-semibold text-yellow-700">
-                                <Sun size={18} /> Morning Session
-                            </div>
-
-                            <input
-                                type="number"
-                                name="morningCount"
-                                min="0"
-                                placeholder="Present Students"
-                                value={form.morningCount}
-                                onChange={handleChange}
-                                className="w-full p-2 border rounded"
-                            />
-
-                            <input
-                                type="text"
-                                name="morningEvent"
-                                placeholder="Event (optional)"
-                                value={form.morningEvent}
-                                onChange={handleChange}
-                                className="w-full p-2 border rounded"
-                            />
-                        </div>
-
-                        {/* AFTERNOON */}
-                        <div className="bg-indigo-50 p-4 rounded-xl space-y-3">
-                            <div className="flex items-center gap-2 font-semibold text-indigo-700">
-                                <Moon size={18} /> Afternoon Session
-                            </div>
-
-                            <input
-                                type="number"
-                                name="afternoonCount"
-                                min="0"
-                                placeholder="Present Students"
-                                value={form.afternoonCount}
-                                onChange={handleChange}
-                                className="w-full p-2 border rounded"
-                            />
-
-                            <input
-                                type="text"
-                                name="afternoonEvent"
-                                placeholder="Event (optional)"
-                                value={form.afternoonEvent}
-                                onChange={handleChange}
-                                className="w-full p-2 border rounded"
-                            />
-                        </div>
-
-                    </div>
-
-                    <button className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
-                        Save Attendance
-                    </button>
-                </form>
-
-                {/* RECORDS */}
-                <div className="space-y-4">
-                    <h2 className="text-2xl font-semibold text-slate-700">
-                        Attendance Records
-                    </h2>
-
-                    {records.map((rec) => (
-                        <AttendanceCard
-                            key={rec.id}
-                            record={rec}
-                            isEditing={editingId === rec.id}
-                            onEdit={() => setEditingId(rec.id)}
-                            onSave={handleSave}
-                        />
+                            {dept === "all" ? <Building2 size={16} /> : null}
+                            {dept === "all" ? "All Departments" : dept}
+                        </button>
                     ))}
                 </div>
 
-            </div>
-        </div>
-    );
-};
+                <div className="grid lg:grid-cols-12 gap-8">
 
-/* ---------------- RECORD CARD ---------------- */
+                    {/* --- LEFT: ENTRY FORM --- */}
+                    <div className="lg:col-span-7 space-y-6">
+                        <form
+                            onSubmit={handleSubmit}
+                            className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden hide-scrollbar"
+                        >
+                            {/* Card Header */}
+                            <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+                                <h2 className="font-semibold text-lg flex items-center gap-2">
+                                    <Clock size={18} className="text-gray-400" />
+                                    New Entry
+                                </h2>
+                                {showSuccess && (
+                                    <span className="text-xs font-bold text-green-600 bg-green-100 px-3 py-1 rounded-full animate-pulse flex items-center gap-1">
+                                        <CheckCircle2 size={12} /> Saved Successfully
+                                    </span>
+                                )}
+                            </div>
 
-const AttendanceCard = ({ record, isEditing, onEdit, onSave }) => {
-    const [editData, setEditData] = useState(record);
+                            <div className="p-6 space-y-8">
+                                {/* Class Selection */}
+                                <div className="space-y-2">
+                                    <div className="flex justify-between">
+                                        <label className="text-sm font-bold text-gray-700">Select Class</label>
+                                        {/* Display Max Capacity Helper */}
+                                        {selectedClassLimit > 0 && (
+                                            <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+                                                Max Capacity: {selectedClassLimit}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="relative">
+                                        <select
+                                            value={form.classId}
+                                            onChange={handleClassChange}
+                                            className="w-full p-4 pl-4 pr-10 bg-gray-50 border border-gray-200 rounded-xl appearance-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-medium text-gray-700 cursor-pointer"
+                                            required
+                                        >
+                                            <option value="">-- Choose a Class --</option>
+                                            {classes.map((cls) => (
+                                                <option key={cls._id} value={cls._id}>
+                                                    {cls.name} ({cls.department})
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 rotate-90 pointer-events-none" size={18} />
+                                    </div>
+                                </div>
 
-    return (
-        <div className="bg-white rounded-xl shadow-md p-5 border-l-4 border-indigo-500">
-            <div className="flex justify-between items-start">
-                <div>
-                    <h3 className="text-xl font-bold">
-                        {record.className}
-                    </h3>
+                                <div className="grid md:grid-cols-2 gap-6">
+                                    {/* MORNING SECTION */}
+                                    <div className="space-y-4 bg-amber-50/50 p-5 rounded-2xl border border-amber-100 hover:border-amber-200 transition-colors">
+                                        <div className="flex items-center gap-2 text-amber-600 font-bold border-b border-amber-200 pb-2 mb-2">
+                                            <Sun className="fill-amber-400" size={20} />
+                                            <h3>Morning Shift</h3>
+                                        </div>
 
-                    <p className="text-sm text-slate-500">
-                        📅 {record.date}
-                    </p>
+                                        <InputGroup
+                                            label="Headcount"
+                                            icon={Users}
+                                            error={errors.MornCount} // Pass Error
+                                        >
+                                            <input
+                                                type="number"
+                                                name="MornCount"
+                                                min="0"
+                                                max={selectedClassLimit || undefined} // HTML5 validation constraint
+                                                placeholder="0"
+                                                value={form.MornCount}
+                                                onChange={handleChange}
+                                                disabled={!form.classId}
+                                                // Conditional styling based on error
+                                                className={`w-full p-3 bg-white border rounded-lg focus:ring-2 outline-none text-2xl font-bold text-gray-700 text-center placeholder:text-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed
+                                                ${errors.MornCount
+                                                        ? "border-red-300 focus:ring-red-400 text-red-600"
+                                                        : "border-amber-200 focus:ring-amber-400"}`}
+                                            />
+                                        </InputGroup>
 
-                    <p className="mt-2 text-slate-700">
-                        🌅 Morning: {record.morning.count}
-                        {record.morning.event && (
-                            <span className="text-sm text-slate-500">
-                                {" "} | 📌 {record.morning.event}
-                            </span>
+                                        <InputGroup label="Event Name (Optional)" icon={Calendar}>
+                                            <input
+                                                type="text"
+                                                name="MEventName"
+                                                placeholder="e.g. Workshop"
+                                                value={form.MEventName}
+                                                onChange={handleChange}
+                                                disabled={!form.classId}
+                                                className="w-full p-2.5 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none text-sm disabled:bg-gray-100"
+                                            />
+                                        </InputGroup>
+                                    </div>
+
+                                    {/* AFTERNOON SECTION */}
+                                    <div className="space-y-4 bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100 hover:border-indigo-200 transition-colors">
+                                        <div className="flex items-center gap-2 text-indigo-600 font-bold border-b border-indigo-200 pb-2 mb-2">
+                                            <Moon className="fill-indigo-400" size={20} />
+                                            <h3>Afternoon Shift</h3>
+                                        </div>
+
+                                        <InputGroup
+                                            label="Headcount"
+                                            icon={Users}
+                                            error={errors.AftCount} // Pass Error
+                                        >
+                                            <input
+                                                type="number"
+                                                name="AftCount"
+                                                min="0"
+                                                max={selectedClassLimit || undefined}
+                                                placeholder="0"
+                                                value={form.AftCount}
+                                                onChange={handleChange}
+                                                disabled={!form.classId}
+                                                className={`w-full p-3 bg-white border rounded-lg focus:ring-2 outline-none text-2xl font-bold text-gray-700 text-center placeholder:text-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed
+                                                ${errors.AftCount
+                                                        ? "border-red-300 focus:ring-red-400 text-red-600"
+                                                        : "border-indigo-200 focus:ring-indigo-400"}`}
+                                            />
+                                        </InputGroup>
+
+                                        <InputGroup label="Event Name (Optional)" icon={Calendar}>
+                                            <input
+                                                type="text"
+                                                name="AEventName"
+                                                placeholder="e.g. Lab Exam"
+                                                value={form.AEventName}
+                                                onChange={handleChange}
+                                                disabled={!form.classId}
+                                                className="w-full p-2.5 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-400 outline-none text-sm disabled:bg-gray-100"
+                                            />
+                                        </InputGroup>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Form Footer */}
+                            <div className="p-6 bg-gray-50 border-t border-gray-100">
+                                <button
+                                    type="submit"
+                                    // Disable if saving, no class selected, OR validation errors exist
+                                    disabled={isSaving || !form.classId || Object.keys(errors).length > 0}
+                                    className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 transition-all transform active:scale-[0.99]
+                    ${isSaving || !form.classId || Object.keys(errors).length > 0
+                                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                            : "bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-indigo-200"
+                                        }`}
+                                >
+                                    {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
+                                    {isSaving ? "Saving Entry..." : "Submit Attendance"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    {/* --- RIGHT: RECORDS LIST (Unchanged) --- */}
+                    <div className="lg:col-span-5 space-y-6">
+                        {/* ... (Keep existing records list code exactly as is) ... */}
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                <History className="text-gray-400" />
+                                Recent Entries
+                            </h2>
+                            <span className="text-xs text-gray-400 font-medium">Auto-updates</span>
+                        </div>
+                        {isLoading ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-gray-400 space-y-3">
+                                <Loader2 className="animate-spin" size={32} />
+                                <p>Loading records...</p>
+                            </div>
+                        ) : records.length === 0 ? (
+                            <div className="bg-white border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center space-y-3">
+                                <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto text-gray-300">
+                                    <LayoutDashboard size={32} />
+                                </div>
+                                <h3 className="text-gray-600 font-medium">No records yet</h3>
+                                <p className="text-gray-400 text-sm">Select a class on the left to start marking attendance for today.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar hide-scrollbar">
+                                {records.map((rec) => (
+                                    <div
+                                        key={rec._id}
+                                        className="group bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-indigo-100 transition-all"
+                                    >
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">
+                                                    Class
+                                                </span>
+                                                <h3 className="text-lg font-bold text-gray-800 leading-none">
+                                                    {rec.className}
+                                                </h3>
+                                            </div>
+                                            <div className="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-md font-mono">
+                                                {new Date(rec.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-100 flex flex-col items-center">
+                                                <span className="text-xs text-amber-600 font-semibold mb-1 flex items-center gap-1">
+                                                    <Sun size={10} /> Morning
+                                                </span>
+                                                <span className="text-xl font-bold text-gray-800">{rec.MornCount}</span>
+                                                {rec.MEventName && (
+                                                    <span className="text-[10px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded mt-1 truncate max-w-full">
+                                                        {rec.MEventName}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            <div className="bg-indigo-50 p-2.5 rounded-lg border border-indigo-100 flex flex-col items-center">
+                                                <span className="text-xs text-indigo-600 font-semibold mb-1 flex items-center gap-1">
+                                                    <Moon size={10} /> Afternoon
+                                                </span>
+                                                <span className="text-xl font-bold text-gray-800">{rec.AftCount}</span>
+                                                {rec.AEventName && (
+                                                    <span className="text-[10px] text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded mt-1 truncate max-w-full">
+                                                        {rec.AEventName}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         )}
-                    </p>
+                    </div>
 
-                    <p className="text-slate-700">
-                        🌇 Afternoon: {record.afternoon.count}
-                        {record.afternoon.event && (
-                            <span className="text-sm text-slate-500">
-                                {" "} | 📌 {record.afternoon.event}
-                            </span>
-                        )}
-                    </p>
                 </div>
-
-                {!isEditing ? (
-                    <button onClick={onEdit}>
-                        <Edit2 className="text-indigo-600" />
-                    </button>
-                ) : (
-                    <button
-                        onClick={() =>
-                            onSave(record.id, {
-                                ...editData,
-                                morning: {
-                                    ...editData.morning,
-                                    count: Number(editData.morning.count),
-                                },
-                                afternoon: {
-                                    ...editData.afternoon,
-                                    count: Number(editData.afternoon.count),
-                                },
-                            })
-                        }
-                    >
-                        <Save className="text-green-600" />
-                    </button>
-                )}
             </div>
         </div>
     );
