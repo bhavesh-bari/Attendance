@@ -1,206 +1,194 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import {
+  Users,
+  TrendingUp,
+  CalendarDays,
+  Sun,
+  Moon,
+  Trophy,
+  Star,
+  Calendar
+} from "lucide-react";
 
-const DepartmentComparison = ({ data, availableDepartments }) => {
-  // Initialize state based on API data structure (left/right)
-  // Note: We use 'department' instead of 'name' based on your API
-  const [selectedDeptA, setSelectedDeptA] = useState(data?.left?.department || "");
-  const [selectedDeptB, setSelectedDeptB] = useState(data?.right?.department || "");
+const DepartmentComparison = ({ availableDepartments }) => {
+  const [leftDept, setLeftDept] = useState("");
+  const [rightDept, setRightDept] = useState("");
+  const [comparisonData, setComparisonData] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // Update state if data prop changes
   useEffect(() => {
-    if (data?.left?.department) setSelectedDeptA(data.left.department);
-    if (data?.right?.department) setSelectedDeptB(data.right.department);
-  }, [data]);
+    if (availableDepartments?.length >= 2) {
+      setLeftDept(availableDepartments[0].name);
+      setRightDept(availableDepartments[1].name);
+    }
+  }, [availableDepartments]);
 
-  const colorA = "text-blue-600";
-  const colorB = "text-green-600";
-  const bgColorA = "bg-blue-50";
-  const bgColorB = "bg-green-50";
-  const borderA = "border-blue-500";
-  const borderB = "border-green-500";
+  useEffect(() => {
+    if (!leftDept || !rightDept) return;
+
+    const fetchComparison = async () => {
+      setLoading(true);
+      try {
+        const query = new URLSearchParams({
+          mode: "compare",
+          compareType: "department",
+          left: leftDept,
+          right: rightDept
+        });
+        const res = await fetch(`/api/analytics?${query.toString()}`);
+        const data = await res.json();
+        if (data.success) setComparisonData(data.compare);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchComparison();
+  }, [leftDept, rightDept]);
 
   const MetricCard = ({
     title,
     value,
-    colorClass = "text-gray-900",
-    size = "text-3xl",
+    icon: Icon,
+    color = "text-gray-700",
+    bg = "bg-white",
+    size = "text-base sm:text-lg md:text-xl"
   }) => (
-    <div className="p-4 bg-white rounded-lg shadow border min-w-0">
-      <p className="text-sm text-gray-500 truncate">{title}</p>
-      <p className={`${size} font-extrabold ${colorClass} break-words`}>
-        {value}
-      </p>
+    <div className={`p-3 sm:p-4 rounded-lg shadow border ${bg}`}>
+      <div className="flex items-center gap-2 text-gray-500 text-xs sm:text-sm mb-1">
+        {Icon && <Icon size={14} />}
+        <span>{title}</span>
+      </div>
+      <div className={`font-extrabold ${color} ${size}`}>{value}</div>
+    </div>
+  );
+
+  const renderColumn = (data, color, bgColor, borderColor) => (
+    <div className={`p-4 sm:p-6 rounded-xl border-t-8 ${borderColor} ${bgColor}`}>
+      <h2 className={`text-lg sm:text-xl md:text-2xl font-black mb-5 ${color}`}>
+        {data?.department || "—"}
+      </h2>
+
+      <MetricCard
+        title="Overall Attendance"
+        value={`${data?.overall?.attendance ?? 0}%`}
+        icon={TrendingUp}
+        color={color}
+        bg="bg-white"
+        size="text-xl sm:text-2xl md:text-3xl"
+      />
+
+      <div className="mt-3">
+        <MetricCard
+          title="Today's Average"
+          value={`${data?.today?.attendance ?? 0}%`}
+          icon={CalendarDays}
+          bg="bg-gray-50"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        <MetricCard
+          title="Morning"
+          value={`${data?.today?.morning ?? 0}%`}
+          icon={Sun}
+          bg="bg-yellow-50"
+          color="text-yellow-700"
+        />
+        <MetricCard
+          title="Afternoon"
+          value={`${data?.today?.afternoon ?? 0}%`}
+          icon={Moon}
+          bg="bg-indigo-50"
+          color="text-indigo-700"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        <MetricCard
+          title="Total Students"
+          value={data?.today?.totalStudents ?? 0}
+          icon={Users}
+          bg="bg-emerald-50"
+          color="text-emerald-700"
+        />
+        <MetricCard
+          title="Events"
+          value={data?.overall?.totalEvents ?? 0}
+          icon={Calendar}
+          bg="bg-pink-50"
+          color="text-pink-700"
+        />
+      </div>
+
+      <div className="mt-3 space-y-3">
+        <MetricCard
+          title="Monthly Attendance"
+          value={`${data?.month?.attendance ?? 0}%`}
+          icon={CalendarDays}
+        />
+        <MetricCard
+          title="Total Classes"
+          value={data?.totalClasses ?? 0}
+          icon={Users}
+        />
+        <MetricCard
+          title="Best Class"
+          value={
+            data?.bestClass
+              ? `${data.bestClass.className} (${data.bestClass.avg}%)`
+              : "—"
+          }
+          icon={Star}
+          bg="bg-blue-50"
+          color="text-blue-700"
+        />
+        <MetricCard
+          title="Department Rank"
+          value={data?.departmentRank ?? "--"}
+          icon={Trophy}
+          bg="bg-amber-50"
+          color="text-amber-700"
+        />
+      </div>
     </div>
   );
 
   return (
-    <div className="mx-auto p-6 bg-gray-50 rounded-xl shadow-2xl">
-
-      {/* SELECTION */}
-      <div className="flex justify-between mb-6">
+    <div className="mx-auto p-4 sm:p-6 bg-gray-50 rounded-xl shadow-2xl">
+      <div className="flex gap-4 mb-6">
         <select
-          value={selectedDeptA}
-          onChange={(e) => setSelectedDeptA(e.target.value)}
-          className="p-2 border rounded-lg"
+          value={leftDept}
+          onChange={(e) => setLeftDept(e.target.value)}
+          className="p-2 border rounded-lg w-full"
         >
-          {availableDepartments?.map((d) => (
-            <option key={d.id} value={d.name}>
-              {d.name}
-            </option>
+          {availableDepartments?.map(d => (
+            <option key={d.id} value={d.name}>{d.name}</option>
           ))}
         </select>
 
         <select
-          value={selectedDeptB}
-          onChange={(e) => setSelectedDeptB(e.target.value)}
-          className="p-2 border rounded-lg"
+          value={rightDept}
+          onChange={(e) => setRightDept(e.target.value)}
+          className="p-2 border rounded-lg w-full"
         >
-          {availableDepartments?.map((d) => (
-            <option key={d.id} value={d.name}>
-              {d.name}
-            </option>
+          {availableDepartments?.map(d => (
+            <option key={d.id} value={d.name}>{d.name}</option>
           ))}
         </select>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-        {/* ================= DEPARTMENT A (LEFT) ================= */}
-        <div className={`p-6 rounded-xl border-t-8 ${borderA} ${bgColorA}`}>
-          <h2 className={`text-2xl font-black mb-6 ${colorA}`}>
-            {data?.left?.department || "—"}
-          </h2>
-
-          <MetricCard
-            title="Overall Attendance"
-            value={`${data?.left?.overall?.attendance ?? 0}%`}
-            colorClass={colorA}
-            size="text-4xl"
-          />
-
-          <div className="grid grid-cols-3 gap-3">
-            <MetricCard
-              title="Morning"
-              value={`${data?.left?.overall?.morning ?? 0}%`}
-              size="text-xl"
-            />
-            <MetricCard
-              title="Afternoon"
-              value={`${data?.left?.overall?.afternoon ?? 0}%`}
-              size="text-xl"
-            />
-            <MetricCard
-              title="Events"
-              value={data?.left?.overall?.totalEvents ?? 0}
-              size="text-xl"
-            />
-          </div>
-
-          <MetricCard
-            title="Today's Attendance"
-            value={`${data?.left?.today?.attendance ?? 0}%`}
-          />
-
-          <MetricCard
-            title="Monthly Attendance"
-            value={`${data?.left?.month?.attendance ?? 0}%`}
-          />
-
-          <MetricCard
-            title="Total Classes"
-            value={data?.left?.totalClasses ?? 0}
-          />
-
-          <MetricCard
-            title="Best Class"
-            value={
-              data?.left?.bestClass
-                ? `${data.left.bestClass.className} (${data.left.bestClass.avg}%)`
-                : "—"
-            }
-          />
-
-          <MetricCard
-            title="Department Rank"
-            value={data?.left?.departmentRank ?? "—"}
-            colorClass={colorA}
-          />
-
-          <MetricCard
-            title="Recent Event"
-            value={data?.left?.recentEvent?.name ?? "—"}
-          />
+      {loading ? (
+        <div className="text-center py-10">Loading comparison...</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {renderColumn(comparisonData?.left, "text-blue-600", "bg-blue-50", "border-blue-500")}
+          {renderColumn(comparisonData?.right, "text-green-600", "bg-green-50", "border-green-500")}
         </div>
-
-        {/* ================= DEPARTMENT B (RIGHT) ================= */}
-        <div className={`p-6 rounded-xl border-t-8 ${borderB} ${bgColorB}`}>
-          <h2 className={`text-2xl font-black mb-6 ${colorB}`}>
-            {data?.right?.department || "—"}
-          </h2>
-
-          <MetricCard
-            title="Overall Attendance"
-            value={`${data?.right?.overall?.attendance ?? 0}%`}
-            colorClass={colorB}
-            size="text-4xl"
-          />
-
-          <div className="grid grid-cols-3 gap-3">
-            <MetricCard
-              title="Morning"
-              value={`${data?.right?.overall?.morning ?? 0}%`}
-              size="text-xl"
-            />
-            <MetricCard
-              title="Afternoon"
-              value={`${data?.right?.overall?.afternoon ?? 0}%`}
-              size="text-xl"
-            />
-            <MetricCard
-              title="Events"
-              value={data?.right?.overall?.totalEvents ?? 0}
-              size="text-xl"
-            />
-          </div>
-
-          <MetricCard
-            title="Today's Attendance"
-            value={`${data?.right?.today?.attendance ?? 0}%`}
-          />
-
-          <MetricCard
-            title="Monthly Attendance"
-            value={`${data?.right?.month?.attendance ?? 0}%`}
-          />
-
-          <MetricCard
-            title="Total Classes"
-            value={data?.right?.totalClasses ?? 0}
-          />
-
-          <MetricCard
-            title="Best Class"
-            value={
-              data?.right?.bestClass
-                ? `${data.right.bestClass.className} (${data.right.bestClass.avg}%)`
-                : "—"
-            }
-          />
-
-          <MetricCard
-            title="Department Rank"
-            value={data?.right?.departmentRank ?? "—"}
-            colorClass={colorB}
-          />
-
-          <MetricCard
-            title="Recent Event"
-            value={data?.right?.recentEvent?.name ?? "—"}
-          />
-        </div>
-
-      </div>
+      )}
     </div>
   );
 };

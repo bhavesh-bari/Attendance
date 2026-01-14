@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { Loader2, Download, Filter } from "lucide-react";
-
+import { Info } from "lucide-react";
 /* ================= CELL COMPONENT ================= */
 const Cell = ({ value, type }) => {
     const isMissing = value === "-";
@@ -227,8 +227,8 @@ export default function AttendanceTable() {
                     No data found for the selected criteria.
                 </div>
             ) : (
-                <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-                    <div className="overflow-x-auto custom-scrollbar">
+                <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden hide-scrollbar">
+                    <div className="overflow-x-auto custom-scrollbar hide-scrollbar">
                         <table className="w-full border-collapse">
                             <thead>
                                 {/* Top Header: Years/Divisions */}
@@ -277,6 +277,17 @@ export default function AttendanceTable() {
                     </div>
                 </div>
             )}
+
+
+            <div className="mt-4 flex items-start gap-2 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+                <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <p>
+                    <span className="font-semibold">Note:</span> For <b>Month</b>, <b>Overall</b>,
+                    and <b>Date Range</b>, the <b>Present Count</b> represents an
+                    <b> average per day</b>.
+                </p>
+            </div>
+
         </div>
     );
 }

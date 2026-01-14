@@ -13,9 +13,9 @@ export async function GET(req) {
     ======================= */
     const scope = searchParams.get("scope") || "institution";
     const department = searchParams.get("department");
-
     const period = searchParams.get("period") || "overall";
-    const mode = searchParams.get("mode"); // compare
+
+    const mode = searchParams.get("mode");
     const compareType = searchParams.get("compareType");
     const left = searchParams.get("left");
     const right = searchParams.get("right");
@@ -35,22 +35,22 @@ export async function GET(req) {
     } else if (period === "month") {
       startDate = new Date(today.getFullYear(), today.getMonth(), 1);
       endDate = today;
-    } else if (period === "date") {
-      startDate = new Date(searchParams.get("date"));
-      startDate.setHours(0, 0, 0, 0);
-      endDate = startDate;
-    } else if (period === "range") {
-      startDate = new Date(searchParams.get("from"));
-      endDate = new Date(searchParams.get("to"));
-      startDate.setHours(0, 0, 0, 0);
-      endDate.setHours(0, 0, 0, 0);
+    } else if (period === "custom") {
+      const start = searchParams.get("startDate");
+      const end = searchParams.get("endDate");
+      if (start && end) {
+        startDate = new Date(start);
+        endDate = new Date(end);
+      }
     }
 
     const dateQuery =
-      startDate && endDate ? { date: { $gte: startDate, $lte: endDate } } : {};
+      startDate && endDate
+        ? { date: { $gte: startDate, $lte: endDate } }
+        : {};
 
     /* =======================
-       FETCH
+       FETCH DATA
     ======================= */
     const [attendance, classes] = await Promise.all([
       Attendance.find(dateQuery),
@@ -61,8 +61,7 @@ export async function GET(req) {
     classes.forEach(c => (classMap[c._id.toString()] = c));
 
     const departments = [...new Set(classes.map(c => c.department))];
-    console.log('Departments:', departments, departments.length);
-    const len = departments.length;
+
     /* =======================
        HELPERS
     ======================= */
@@ -72,7 +71,7 @@ export async function GET(req) {
         const cls = classMap[a.classId?.toString()];
         if (!cls) return;
 
-        let val =
+        const val =
           type === "morning"
             ? a.MornCount
             : type === "afternoon"
@@ -88,22 +87,21 @@ export async function GET(req) {
     const byDate = (records, from, to) =>
       records.filter(r => r.date >= from && r.date <= to);
 
+    const getTotalStudents = classList =>
+      classList.reduce((sum, c) => sum + (c.totalStudents || 0), 0);
+
     /* =====================================================
-       COMPARE (NO RETURN HERE)
+       COMPARE MODE
     ===================================================== */
     let compare = null;
 
     if (mode === "compare") {
 
-      /* =======================
-         DEPARTMENT VS DEPARTMENT
-         ======================= */
+      /* ========== DEPARTMENT COMPARE ========== */
       if (compareType === "department") {
-
         const buildDept = dept => {
           const deptClasses = classes.filter(c => c.department === dept);
           const ids = deptClasses.map(c => c._id.toString());
-
           const records = attendance.filter(a =>
             ids.includes(a.classId?.toString())
           );
@@ -111,6 +109,8 @@ export async function GET(req) {
           const todayRec = byDate(records, today, today);
           const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
           const monthRec = byDate(records, monthStart, today);
+
+          const totalStudents = getTotalStudents(deptClasses);
 
           const bestClass = deptClasses
             .map(c => {
@@ -123,17 +123,15 @@ export async function GET(req) {
 
           const rank =
             departments
-              .map(d => ({
-                d,
-                avg: calcAttendance(
-                  attendance.filter(a =>
-                    classes
-                      .filter(c => c.department === d)
-                      .map(c => c._id.toString())
-                      .includes(a.classId?.toString())
-                  )
-                )
-              }))
+              .map(d => {
+                const clsIds = classes
+                  .filter(c => c.department === d)
+                  .map(c => c._id.toString());
+                const rec = attendance.filter(a =>
+                  clsIds.includes(a.classId?.toString())
+                );
+                return { d, avg: Number(calcAttendance(rec)) };
+              })
               .sort((a, b) => b.avg - a.avg)
               .findIndex(x => x.d === dept) + 1;
 
@@ -143,26 +141,20 @@ export async function GET(req) {
 
           return {
             department: dept,
-
+            totalStudents,
             overall: {
               attendance: calcAttendance(records),
               morning: calcAttendance(records, "morning"),
               afternoon: calcAttendance(records, "afternoon"),
               totalEvents: records.filter(r => r.isEvent).length
             },
-
             today: {
               attendance: calcAttendance(todayRec),
               morning: calcAttendance(todayRec, "morning"),
-              totalEvents: todayRec.filter(r => r.isEvent).length
+              afternoon: calcAttendance(todayRec, "afternoon"),
+              totalStudents
             },
-
-            month: {
-              attendance: calcAttendance(monthRec),
-              morning: calcAttendance(monthRec, "morning"),
-              totalEvents: monthRec.filter(r => r.isEvent).length
-            },
-
+            month: { attendance: calcAttendance(monthRec) },
             totalClasses: deptClasses.length,
             bestClass,
             departmentRank: `#${rank}`,
@@ -182,11 +174,8 @@ export async function GET(req) {
         };
       }
 
-      /* =================
-         CLASS VS CLASS
-         ================= */
+      /* ========== CLASS COMPARE ========== */
       if (compareType === "class") {
-
         const buildClass = className => {
           const cls = classes.find(c => c.name === className);
           if (!cls) return null;
@@ -199,20 +188,25 @@ export async function GET(req) {
           const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
           const monthRec = byDate(records, monthStart, today);
 
-          const deptClasses = classes.filter(c => c.department === cls.department);
+          const deptClasses = classes.filter(
+            c => c.department === cls.department
+          );
+
+          const todayRanks = deptClasses
+            .map(c => {
+              const rec = attendance.filter(
+                a => a.classId?.toString() === c._id.toString()
+              );
+              const todayOnly = byDate(rec, today, today);
+              return {
+                className: c.name,
+                avg: Number(calcAttendance(todayOnly))
+              };
+            })
+            .sort((a, b) => b.avg - a.avg);
 
           const rank =
-            deptClasses
-              .map(c => ({
-                name: c.name,
-                avg: calcAttendance(
-                  attendance.filter(
-                    a => a.classId?.toString() === c._id.toString()
-                  )
-                )
-              }))
-              .sort((a, b) => b.avg - a.avg)
-              .findIndex(x => x.name === cls.name) + 1;
+            todayRanks.findIndex(r => r.className === cls.name) + 1;
 
           const recentEvent = records
             .filter(r => r.isEvent)
@@ -221,26 +215,20 @@ export async function GET(req) {
           return {
             className: cls.name,
             department: cls.department,
-
+            totalStudents: cls.totalStudents,
             overall: {
               attendance: calcAttendance(records),
               morning: calcAttendance(records, "morning"),
               afternoon: calcAttendance(records, "afternoon"),
               totalEvents: records.filter(r => r.isEvent).length
             },
-
             today: {
               attendance: calcAttendance(todayRec),
               morning: calcAttendance(todayRec, "morning"),
-              totalEvents: todayRec.filter(r => r.isEvent).length
+              afternoon: calcAttendance(todayRec, "afternoon"),
+              totalStudents: cls.totalStudents
             },
-
-            month: {
-              attendance: calcAttendance(monthRec),
-              morning: calcAttendance(monthRec, "morning"),
-              totalEvents: monthRec.filter(r => r.isEvent).length
-            },
-
+            month: { attendance: calcAttendance(monthRec) },
             rankInDepartment: `#${rank}`,
             recentEvent: recentEvent
               ? {
@@ -259,9 +247,8 @@ export async function GET(req) {
       }
     }
 
-
     /* =====================================================
-       NORMAL ANALYTICS
+       NORMAL ANALYTICS (UNCHANGED)
     ===================================================== */
     const filteredClasses =
       scope === "department" && department
@@ -269,63 +256,89 @@ export async function GET(req) {
         : classes;
 
     const classStats = {};
+    const eventsList = [];
+
     attendance.forEach(a => {
       const cls = classMap[a.classId?.toString()];
       if (!cls) return;
-      if (scope === "department" && department && cls.department !== department) return;
+      if (scope === "department" && department && cls.department !== department)
+        return;
 
-      classStats[cls.name] ??= { className: cls.name, department: cls.department, total: 0, count: 0 };
+      classStats[cls.name] ??= {
+        className: cls.name,
+        department: cls.department,
+        total: 0,
+        count: 0,
+        mornTotal: 0,
+        aftTotal: 0
+      };
+
       classStats[cls.name].total += Number(calcAttendance([a]));
+      classStats[cls.name].mornTotal += Number(
+        calcAttendance([a], "morning")
+      );
+      classStats[cls.name].aftTotal += Number(
+        calcAttendance([a], "afternoon")
+      );
       classStats[cls.name].count++;
+
+      if (a.isEvent) {
+        eventsList.push({
+          event: a.MEventName || a.AEventName || "Event",
+          date: new Date(a.date).toLocaleDateString(),
+          classes: [cls.name],
+          department: cls.department
+        });
+      }
     });
 
     const classAnalytics = Object.values(classStats).map(c => ({
-      ...c,
-      percentage: (c.total / c.count).toFixed(1)
+      name: c.className,
+      department: c.department,
+      overall: (c.total / c.count).toFixed(1),
+      morning: (c.mornTotal / c.count).toFixed(1),
+      afternoon: (c.aftTotal / c.count).toFixed(1)
     }));
 
     const avgAttendance =
-      classAnalytics.reduce((s, c) => s + Number(c.percentage), 0) /
+      classAnalytics.reduce((s, c) => s + Number(c.overall), 0) /
       (classAnalytics.length || 1);
 
-    /* =======================
-       FINAL RESPONSE
-    ======================= */
     return NextResponse.json({
       success: true,
-
       filters: {
         scope,
         department,
         period,
         availableDepartments: departments,
         availableClasses:
-          department
+          scope === "department"
             ? classes.filter(c => c.department === department)
             : classes
       },
-
       summary:
         scope === "institution"
           ? {
             overallAvgAttendance: avgAttendance.toFixed(1),
             totalDivisions: classes.length,
-            activeDepartments: len
+            activeDepartments: departments.length
           }
           : {
             department,
             departmentAvgAttendance: avgAttendance.toFixed(1),
             totalDivisions: filteredClasses.length
           },
-
       analytics: {
-        classes: classAnalytics
+        classes: classAnalytics,
+        events: eventsList
       },
-
-      compare // ✅ INCLUDED TOGETHER
+      compare
     });
 
   } catch (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
   }
 }

@@ -1,184 +1,183 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import {
+  Users,
+  TrendingUp,
+  Sun,
+  Moon,
+  Trophy,
+  CalendarDays
+} from "lucide-react";
 
-const ClassComparison = ({ data, availableClasses }) => {
-  // Initialize state based on the API response structure
-  const [selectedClassA, setSelectedClassA] = useState(data?.left?.className || "");
-  const [selectedClassB, setSelectedClassB] = useState(data?.right?.className || "");
+const ClassesComparison = ({ availableClasses = [] }) => {
+  const [leftClass, setLeftClass] = useState("");
+  const [rightClass, setRightClass] = useState("");
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // Update state if new data comes in
   useEffect(() => {
-    if (data?.left?.className) setSelectedClassA(data.left.className);
-    if (data?.right?.className) setSelectedClassB(data.right.className);
-  }, [data]);
+    if (availableClasses.length >= 2) {
+      setLeftClass(availableClasses[0].name);
+      setRightClass(availableClasses[1].name);
+    }
+  }, [availableClasses]);
+
+  useEffect(() => {
+    if (!leftClass || !rightClass) return;
+
+    const fetchComparison = async () => {
+      setLoading(true);
+      try {
+        const query = new URLSearchParams({
+          mode: "compare",
+          compareType: "class",
+          left: leftClass,
+          right: rightClass
+        });
+        const res = await fetch(`/api/analytics?${query.toString()}`);
+        const result = await res.json();
+        if (result.success) setData(result.compare);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchComparison();
+  }, [leftClass, rightClass]);
 
   const MetricCard = ({
     title,
     value,
-    colorClass = "text-gray-900",
-    size = "text-2xl"
+    icon: Icon,
+    color = "text-gray-700",
+    bg = "bg-white",
+    size = "text-base sm:text-lg md:text-xl"
   }) => (
-    <div className="p-4 bg-white rounded-lg shadow border">
-      <p className="text-sm text-gray-500 truncate">{title}</p>
-      <p className={`${size} font-bold ${colorClass}`}>{value}</p>
+    <div className={`p-3 sm:p-4 rounded-lg shadow border ${bg}`}>
+      <div className="flex items-center gap-2 text-gray-500 text-xs sm:text-sm mb-1">
+        {Icon && <Icon size={14} />}
+        <span>{title}</span>
+      </div>
+      <div className={`font-bold ${color} ${size}`}>{value}</div>
+    </div>
+  );
+
+  const renderClass = (clsData, color, bgColor, borderColor) => (
+    <div className={`p-4 sm:p-6 ${bgColor} rounded-xl border-t-8 ${borderColor}`}>
+      <h2 className={`text-lg sm:text-xl md:text-2xl font-black ${color} mb-5`}>
+        {clsData?.className || "—"}
+        <span className="text-xs sm:text-sm font-normal text-gray-500 ml-2">
+          ({clsData?.department})
+        </span>
+      </h2>
+
+      <div className="space-y-3">
+        <MetricCard
+          title="Overall Attendance"
+          value={`${clsData?.overall?.attendance ?? 0}%`}
+          icon={TrendingUp}
+          color={color}
+          size="text-xl sm:text-2xl md:text-3xl"
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <MetricCard
+            title="Morning"
+            value={`${clsData?.today?.morning ?? 0}%`}
+            icon={Sun}
+            bg="bg-yellow-50"
+            color="text-yellow-700"
+          />
+          <MetricCard
+            title="Afternoon"
+            value={`${clsData?.today?.afternoon ?? 0}%`}
+            icon={Moon}
+            bg="bg-indigo-50"
+            color="text-indigo-700"
+          />
+        </div>
+
+
+        <div className="grid grid-cols-2 gap-3">
+          <MetricCard
+            title="This Month Avg"
+            value={`${clsData?.month?.attendance ?? 0} %`}
+            icon={Users}
+            bg="bg-pink-50"
+            color="text-pink-700"
+          />
+          <MetricCard
+            title="Today Average"
+            value={`${clsData?.today?.attendance ?? 0}%`}
+            icon={CalendarDays}
+          />
+
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <MetricCard
+            title="Total Students"
+            value={clsData?.today?.totalStudents ?? 0}
+            icon={Users}
+            bg="bg-emerald-50"
+            color="text-emerald-700"
+          />
+          <MetricCard
+            title="Total Events"
+            value={clsData?.overall?.totalEvents || "-"}
+            icon={Trophy}
+            bg="bg-emerald-50"
+            color="text-emerald-700"
+          /> </div>
+        <div className="mt-3">          <MetricCard
+          title="Rank in Dept"
+          value={clsData?.rankInDepartment || "-"}
+          icon={Trophy}
+          bg="bg-amber-50"
+          color="text-amber-700"
+        />
+        </div>
+
+      </div>
     </div>
   );
 
   return (
-    <div className="mx-auto p-6 bg-gray-50 rounded-xl shadow-2xl">
-
-      {/* SELECTION DROPDOWNS */}
-      <div className="flex justify-between mb-6 gap-4">
+    <div className="mx-auto p-4 sm:p-6 bg-gray-50 rounded-xl shadow-2xl">
+      <div className="flex gap-4 mb-6">
         <select
-          value={selectedClassA}
-          onChange={(e) => setSelectedClassA(e.target.value)}
-          className="p-2 border rounded-lg w-full md:w-auto"
+          value={leftClass}
+          onChange={(e) => setLeftClass(e.target.value)}
+          className="p-2 border rounded-lg w-full"
         >
-          {availableClasses?.map((c) => (
+          {availableClasses.map(c => (
             <option key={c.id} value={c.name}>{c.name}</option>
           ))}
         </select>
 
         <select
-          value={selectedClassB}
-          onChange={(e) => setSelectedClassB(e.target.value)}
-          className="p-2 border rounded-lg w-full md:w-auto"
+          value={rightClass}
+          onChange={(e) => setRightClass(e.target.value)}
+          className="p-2 border rounded-lg w-full"
         >
-          {availableClasses?.map((c) => (
+          {availableClasses.map(c => (
             <option key={c.id} value={c.name}>{c.name}</option>
           ))}
         </select>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-        {/* ================= CLASS A (LEFT) ================= */}
-        <div className="p-6 bg-blue-50 rounded-xl border-t-8 border-blue-500">
-          <h2 className="text-2xl font-black text-blue-600 mb-6">
-            {data?.left?.className || "—"}
-            <span className="text-sm font-normal text-gray-500 ml-2">
-              ({data?.left?.department})
-            </span>
-          </h2>
-
-          <div className="space-y-3">
-            <MetricCard
-              title="Overall Attendance"
-              value={`${data?.left?.overall?.attendance ?? 0}%`}
-              colorClass="text-blue-600"
-              size="text-4xl"
-            />
-
-            <div className="grid grid-cols-2 gap-3">
-              <MetricCard
-                title="Morning"
-                value={`${data?.left?.overall?.morning ?? 0}%`}
-              />
-              <MetricCard
-                title="Afternoon"
-                value={`${data?.left?.overall?.afternoon ?? 0}%`}
-              />
-            </div>
-
-            <MetricCard
-              title="Total Events Attended"
-              value={data?.left?.overall?.totalEvents ?? 0}
-            />
-
-            <MetricCard
-              title="Today's Attendance"
-              value={`${data?.left?.today?.attendance ?? 0}%`}
-            />
-
-            <div className="grid grid-cols-2 gap-3">
-              <MetricCard
-                title="Monthly Attendance"
-                value={`${data?.left?.month?.attendance ?? 0}%`}
-              />
-              <MetricCard
-                title="Monthly Events"
-                value={data?.left?.month?.totalEvents ?? 0}
-              />
-            </div>
-
-            <MetricCard
-              title="Rank in Dept"
-              value={data?.left?.rankInDepartment ?? "—"}
-              colorClass="text-blue-600"
-            />
-
-            <MetricCard
-              title="Recent Event"
-              value={data?.left?.recentEvent?.name ?? "—"}
-            />
-          </div>
+      {loading ? (
+        <div className="text-center py-4">Loading...</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {renderClass(data?.left, "text-blue-600", "bg-blue-50", "border-blue-500")}
+          {renderClass(data?.right, "text-green-600", "bg-green-50", "border-green-500")}
         </div>
-
-        {/* ================= CLASS B (RIGHT) ================= */}
-        <div className="p-6 bg-green-50 rounded-xl border-t-8 border-green-500">
-          <h2 className="text-2xl font-black text-green-600 mb-6">
-            {data?.right?.className || "—"}
-            <span className="text-sm font-normal text-gray-500 ml-2">
-              ({data?.right?.department})
-            </span>
-          </h2>
-
-          <div className="space-y-3">
-            <MetricCard
-              title="Overall Attendance"
-              value={`${data?.right?.overall?.attendance ?? 0}%`}
-              colorClass="text-green-600"
-              size="text-4xl"
-            />
-
-            <div className="grid grid-cols-2 gap-3">
-              <MetricCard
-                title="Morning"
-                value={`${data?.right?.overall?.morning ?? 0}%`}
-              />
-              <MetricCard
-                title="Afternoon"
-                value={`${data?.right?.overall?.afternoon ?? 0}%`}
-              />
-            </div>
-
-            <MetricCard
-              title="Total Events Attended"
-              value={data?.right?.overall?.totalEvents ?? 0}
-            />
-
-            <MetricCard
-              title="Today's Attendance"
-              value={`${data?.right?.today?.attendance ?? 0}%`}
-            />
-
-            <div className="grid grid-cols-2 gap-3">
-              <MetricCard
-                title="Monthly Attendance"
-                value={`${data?.right?.month?.attendance ?? 0}%`}
-              />
-              <MetricCard
-                title="Monthly Events"
-                value={data?.right?.month?.totalEvents ?? 0}
-              />
-            </div>
-
-            <MetricCard
-              title="Rank in Dept"
-              value={data?.right?.rankInDepartment ?? "—"}
-              colorClass="text-green-600"
-            />
-
-            <MetricCard
-              title="Recent Event"
-              value={data?.right?.recentEvent?.name ?? "—"}
-            />
-          </div>
-        </div>
-
-      </div>
+      )}
     </div>
   );
 };
 
-export default ClassComparison;
+export default ClassesComparison;

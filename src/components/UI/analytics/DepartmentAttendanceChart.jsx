@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React from "react";
 import {
     BarChart,
     Bar,
@@ -29,37 +29,35 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-export default function DepartmentAttendanceAnalytics() {
-    const rawData = [
-        { name: "Mechanical", overall: 88.3, morning: 90.1, afternoon: 86.4 },
-        { name: "Computer", overall: 84.6, morning: 86.2, afternoon: 82.5 },
-        { name: "Electrical", overall: 82.1, morning: 83.7, afternoon: 80.8 },
-        { name: "IT", overall: 87.5, morning: 89.3, afternoon: 85.4 },
-        { name: "Civil", overall: 79.8, morning: 81.6, afternoon: 78.2 },
-        { name: "ENTC", overall: 85.9, morning: 88.1, afternoon: 83.7 },
-        { name: "Production", overall: 80.5, morning: 82.0, afternoon: 79.0 },
-        { name: "AI", overall: 91.2, morning: 92.5, afternoon: 90.3 },
-    ];
+// 🔥 UPDATED: Now accepts data and filter from Parent
+export default function DepartmentAttendanceChart({ rawData = [], filterProp = "overall" }) {
 
-    const [filter, setFilter] = useState("overall");
-
-    // Filter Logic
-    const getFilteredBars = () => {
-        switch (filter) {
-            case "overall":
-                return ["overall"];
+    // Logic to determine which bars to show based on Parent's filter
+    const getVisibleBars = () => {
+        switch (filterProp) {
             case "morning":
-                return ["morning"];
+                return [{ key: "morning", color: "#10b981", label: "Morning" }];
             case "afternoon":
-                return ["afternoon"];
-            case "both":
-                return ["morning", "afternoon"];
+                return [{ key: "afternoon", color: "#f59e0b", label: "Afternoon" }];
+            case "both": // Using "both" or if parent passes specific logic
+                return [
+                    { key: "morning", color: "#10b981", label: "Morning" },
+                    { key: "afternoon", color: "#f59e0b", label: "Afternoon" }
+                ];
+            case "overall":
             default:
-                return ["overall"];
+                return [{ key: "overall", color: "#4f46e5", label: "Overall" }];
         }
     };
 
-    const visibleBars = getFilteredBars();
+    const visibleBars = getVisibleBars();
+
+    // Dynamic width calculation for scrolling if many departments exist
+    const dynamicWidth = Math.max(800, rawData.length * 100);
+
+    if (!rawData || rawData.length === 0) {
+        return <div className="p-6 text-center text-gray-500">No data available for the current selection.</div>;
+    }
 
     return (
         <div className="p-6 bg-white rounded-xl shadow-lg w-full overflow-hidden">
@@ -67,35 +65,11 @@ export default function DepartmentAttendanceAnalytics() {
                 Department Attendance Analytics
             </h2>
 
-            {/* FILTER BUTTONS */}
-            <div className="flex gap-3 justify-center mb-4">
-                {["overall", "morning", "afternoon", "both"].map((f) => (
-                    <button
-                        key={f}
-                        onClick={() => setFilter(f)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${
-                            filter === f
-                                ? "bg-indigo-600 text-white border-indigo-600"
-                                : "bg-white text-indigo-600 border-indigo-300"
-                        }`}
-                    >
-                        {f === "overall"
-                            ? "Overall"
-                            : f === "both"
-                            ? "Morning + Afternoon"
-                            : f.charAt(0).toUpperCase() + f.slice(1)}
-                    </button>
-                ))}
-            </div>
+            {/* Note: Filter buttons are removed here because they are now in the Parent Component (OverallAnalytics) */}
 
-            {/* HORIZONTAL SCROLL */}
+            {/* HORIZONTAL SCROLL WRAPPER */}
             <div className="w-full overflow-x-auto hide-scrollbar">
-                <div
-                    className="flex justify-center"
-                    style={{
-                        minWidth: `${rawData.length * 120}px`, // dynamic size per bar
-                    }}
-                >
+                <div style={{ minWidth: `${dynamicWidth}px` }}>
                     <ResponsiveContainer width="100%" height={420}>
                         <BarChart
                             data={rawData}
@@ -119,31 +93,26 @@ export default function DepartmentAttendanceAnalytics() {
                             <Tooltip content={<CustomTooltip />} cursor={{ fill: "transparent" }} />
                             <Legend wrapperStyle={{ paddingTop: 10 }} />
 
-                            {/* Bars With Labels */}
-                            {visibleBars.includes("overall") && (
-                                <Bar dataKey="overall" fill="#4f46e5" radius={[6, 6, 0, 0]}>
-                                    <LabelList dataKey="overall" position="top" formatter={(v) => `${v}%`} />
+                            {/* Dynamically Render Bars */}
+                            {visibleBars.map((bar) => (
+                                <Bar
+                                    key={bar.key}
+                                    dataKey={bar.key}
+                                    fill={bar.color}
+                                    name={bar.label}
+                                    radius={[6, 6, 0, 0]}
+                                >
+                                    <LabelList dataKey={bar.key} position="top" formatter={(v) => `${v}%`} />
                                 </Bar>
-                            )}
+                            ))}
 
-                            {visibleBars.includes("morning") && (
-                                <Bar dataKey="morning" fill="#10b981" radius={[6, 6, 0, 0]}>
-                                    <LabelList dataKey="morning" position="top" formatter={(v) => `${v}%`} />
-                                </Bar>
-                            )}
-
-                            {visibleBars.includes("afternoon") && (
-                                <Bar dataKey="afternoon" fill="#f59e0b" radius={[6, 6, 0, 0]}>
-                                    <LabelList dataKey="afternoon" position="top" formatter={(v) => `${v}%`} />
-                                </Bar>
-                            )}
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
             </div>
 
             <div className="mt-6 text-center text-gray-600 text-sm">
-                Showing {rawData.length} departments’ attendance.
+                Showing {rawData.length} departments.
             </div>
         </div>
     );

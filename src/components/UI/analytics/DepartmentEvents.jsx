@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
     PieChart,
     Pie,
@@ -34,63 +34,46 @@ const CustomTooltip = ({ active, payload }) => {
     return null;
 };
 
-export default function DepartmentEventsAnalytics() {
-    // Pie data
-    const data = [
-        { name: "Mechanical Engineering", value: 42 },
-        { name: "Computer Engineering", value: 58 },
-        { name: "Electrical Engineering", value: 33 },
-        { name: "Civil Engineering", value: 21 },
-        { name: "Electronics & Comm.", value: 46 },
-        { name: "Information Technology", value: 53 },
-        { name: "Automobile Engineering", value: 27 },
-        { name: "Chemical Engineering", value: 37 },
-    ];
+// 🔥 UPDATED: Accepts 'events' prop from Parent
+export default function DepartmentEvents({ events = [] }) {
 
-    // Event details
-    const eventDetails = {
-        "Computer Engineering": [
-            {
-                date: "30-04-2025",
-                event: "AWS Seminar",
-                classes: [
-                    "CS 2nd Year A",
-                    "CS 2nd Year B",
-                    "CS 2nd Year C",
-                    "CS 3rd Year A",
-                ],
-            },
-            {
-                date: "10-05-2025",
-                event: "AI & ML Workshop",
-                classes: ["CS 3rd Year B", "CS 4th Year A"],
-            },
-        ],
-        "Mechanical Engineering": [
-            {
-                date: "25-03-2025",
-                event: "AutoCAD Design Competition",
-                classes: ["ME 2nd Year A", "ME 3rd Year A"],
-            },
-        ],
-        "Electrical Engineering": [
-            {
-                date: "12-04-2025",
-                event: "Solar Panel Project Expo",
-                classes: ["EE 3rd Year A", "EE 4th Year B"],
-            },
-        ],
-    };
+    // Process Data: Aggregate events by Department
+    const { chartData, groupedEvents } = useMemo(() => {
+        const counts = {};
+        const groups = {};
+
+        events.forEach(event => {
+            const deptName = event.department || "Unknown";
+
+            // Count for Pie Chart
+            counts[deptName] = (counts[deptName] || 0) + 1;
+
+            // Group details for Dialog
+            if (!groups[deptName]) groups[deptName] = [];
+            groups[deptName].push(event);
+        });
+
+        const chartData = Object.keys(counts).map(dept => ({
+            name: dept,
+            value: counts[dept]
+        }));
+
+        return { chartData, groupedEvents: groups };
+    }, [events]);
 
     const [selectedDept, setSelectedDept] = useState(null);
 
-    const handleSliceClick = (dept) => {
-        if (dept?.name && eventDetails[dept.name]) {
-            setSelectedDept(dept.name);
+    const handleSliceClick = (data) => {
+        if (data?.name && groupedEvents[data.name]) {
+            setSelectedDept(data.name);
         }
     };
 
     const handleClose = () => setSelectedDept(null);
+
+    if (events.length === 0) {
+        return <div className="p-6 text-center text-gray-500 bg-white rounded-xl shadow-lg">No event data available.</div>;
+    }
 
     return (
         <div className="p-6 bg-white rounded-xl shadow-lg w-full">
@@ -104,13 +87,13 @@ export default function DepartmentEventsAnalytics() {
                 </p>
             </div>
 
-            {/* Responsive Scroll Wrapper — horizontal scrolling with hidden scrollbar */}
+            {/* Pie Chart */}
             <div className="w-full overflow-x-auto hide-scrollbar">
                 <div className="min-w-[600px] mx-auto flex justify-center">
                     <ResponsiveContainer width="100%" height={400}>
                         <PieChart>
                             <Pie
-                                data={data}
+                                data={chartData}
                                 dataKey="value"
                                 nameKey="name"
                                 outerRadius={150}
@@ -121,7 +104,7 @@ export default function DepartmentEventsAnalytics() {
                                     `${name.split(" ")[0]} ${(percent * 100).toFixed(0)}%`
                                 }
                             >
-                                {data.map((entry, index) => (
+                                {chartData.map((entry, index) => (
                                     <Cell
                                         key={`cell-${index}`}
                                         fill={COLORS[index % COLORS.length]}
@@ -136,23 +119,21 @@ export default function DepartmentEventsAnalytics() {
                 </div>
             </div>
 
-            {/* Footer */}
             <div className="mt-6 text-center text-gray-600 text-sm">
-                Showing total events across {data.length} departments.
+                Showing total events across {chartData.length} departments.
             </div>
 
-            {/* Dialog */}
+            {/* Dialog for Details */}
             <Dialog.Root open={!!selectedDept} onOpenChange={handleClose}>
                 <Dialog.Portal>
                     <Dialog.Overlay className="fixed inset-0 bg-black/40" />
-                    <Dialog.Content className="fixed left-1/2 top-1/2 w-[90%] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg">
+                    <Dialog.Content className="fixed left-1/2 top-1/2 w-[90%] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg z-50">
                         <Dialog.Title className="text-lg font-semibold text-indigo-700">
                             {selectedDept} — Events
                         </Dialog.Title>
 
-                        {/* Dialog content: vertical scroll with hidden scrollbar */}
                         <div className="mt-4 space-y-3 max-h-60 overflow-y-auto hide-scrollbar">
-                            {eventDetails[selectedDept]?.map((event, idx) => (
+                            {groupedEvents[selectedDept]?.map((event, idx) => (
                                 <div
                                     key={idx}
                                     className="border-l-4 border-indigo-500 pl-3 py-1 bg-gray-50 rounded-r"
@@ -160,15 +141,10 @@ export default function DepartmentEventsAnalytics() {
                                     <p className="font-semibold text-gray-800">{event.event}</p>
                                     <p className="text-sm text-gray-600">Date: {event.date}</p>
                                     <p className="text-sm text-gray-600 mt-1">
-                                        Classes: {event.classes.join(", ")}
+                                        Classes: {event.classes?.join(", ") || "N/A"}
                                     </p>
                                 </div>
                             ))}
-
-                            {/* Fallback when no events */}
-                            {!eventDetails[selectedDept] && (
-                                <p className="text-sm text-gray-500">No event details available.</p>
-                            )}
                         </div>
 
                         <Dialog.Close asChild>

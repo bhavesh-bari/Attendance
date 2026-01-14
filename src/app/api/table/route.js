@@ -3,20 +3,8 @@ import { connectDB } from "@/lib/mongodb";
 import Attendance from "@/models/Attendance";
 import Class from "@/models/Class";
 
-const YEAR_MAP = {
-    1: "FE",
-    2: "SE",
-    3: "TE",
-    4: "BE"
-};
-
-// Reverse map for filtering query
-const REVERSE_YEAR_MAP = {
-    "FE": 1,
-    "SE": 2,
-    "TE": 3,
-    "BE": 4
-};
+const YEAR_MAP = { 1: "FE", 2: "SE", 3: "TE", 4: "BE" };
+const REVERSE_YEAR_MAP = { FE: 1, SE: 2, TE: 3, BE: 4 };
 
 export async function GET(req) {
     await connectDB();
@@ -24,7 +12,7 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
 
     const departmentFilter = searchParams.get("department") || "ALL";
-    const yearFilter = searchParams.get("year") || "ALL"; // <--- NEW: Year Param
+    const yearFilter = searchParams.get("year") || "ALL";
     const period = searchParams.get("period") || "overall";
 
     const dateParam = searchParams.get("date");
@@ -45,22 +33,26 @@ export async function GET(req) {
             startDate = new Date(today);
             endDate = new Date(today);
             break;
+
         case "month":
             startDate = new Date(today.getFullYear(), today.getMonth(), 1);
             endDate = new Date(today);
             break;
+
         case "date":
             if (dateParam) {
                 startDate = new Date(dateParam);
                 endDate = new Date(dateParam);
             }
             break;
+
         case "range":
             if (fromParam && toParam) {
                 startDate = new Date(fromParam);
                 endDate = new Date(toParam);
             }
             break;
+
         case "overall":
         default:
             break;
@@ -69,36 +61,26 @@ export async function GET(req) {
     if (startDate) startDate.setHours(0, 0, 0, 0);
     if (endDate) endDate.setHours(23, 59, 59, 999);
 
-    const dateQuery = startDate && endDate
-        ? { date: { $gte: startDate, $lte: endDate } }
-        : {};
+    const dateQuery =
+        startDate && endDate
+            ? { date: { $gte: startDate, $lte: endDate } }
+            : {};
 
-    /* ================= FETCH DATA (With Year Filter) ================= */
-
-    // Build Class Query
+    /* ================= CLASS QUERY ================= */
     const classQuery = {};
-    if (departmentFilter !== "ALL") {
-        classQuery.department = departmentFilter;
-    }
-    // NEW: Add Year logic
+    if (departmentFilter !== "ALL") classQuery.department = departmentFilter;
     if (yearFilter !== "ALL" && REVERSE_YEAR_MAP[yearFilter]) {
         classQuery.year = REVERSE_YEAR_MAP[yearFilter];
     }
 
-    // Fetch filtered classes
     const classes = await Class.find(classQuery).lean();
-
-    // Fetch Attendance
     const attendance = await Attendance.find(dateQuery).lean();
 
-    /* ================= BUILD COLUMNS ================= */
+    /* ================= COLUMNS ================= */
     const columnSet = new Set();
-
     classes.forEach(c => {
-        const yearLabel = YEAR_MAP[c.year];
-        if (yearLabel) {
-            columnSet.add(`${yearLabel}-${c.division}`);
-        }
+        const y = YEAR_MAP[c.year];
+        if (y) columnSet.add(`${y}-${c.division}`);
     });
 
     const columns = Array.from(columnSet).sort((a, b) => {
@@ -109,27 +91,38 @@ export async function GET(req) {
     });
 
     /* ================= HELPERS ================= */
+
+    const isMultiDay = ["month", "overall", "range"].includes(period);
+
     const calcCell = (records, session, totalStudents) => {
         if (!records.length) return { P: 0, "%": 0 };
 
         let present = 0;
+        const uniqueDays = new Set();
+
         records.forEach(r => {
-            present += session === "morning"
-                ? (r.MornCount || 0)
-                : (r.AftCount || 0);
+            uniqueDays.add(new Date(r.date).toDateString());
+            present +=
+                session === "morning"
+                    ? r.MornCount || 0
+                    : r.AftCount || 0;
         });
 
-        const capacity = records.length * totalStudents;
+        const days = isMultiDay ? uniqueDays.size || 1 : 1;
+        const avgPresent = present / days;
+
+        const capacityPerDay = totalStudents * records.length / days;
+        const percent = capacityPerDay
+            ? Number(((avgPresent / capacityPerDay) * 100).toFixed(2))
+            : 0;
 
         return {
-            P: present,
-            "%": capacity
-                ? Number(((present / capacity) * 100).toFixed(2))
-                : 0
+            P: Number(avgPresent.toFixed(2)),
+            "%": percent
         };
     };
 
-    /* ================= BUILD ROWS ================= */
+    /* ================= ROWS ================= */
     const departments = [...new Set(classes.map(c => c.department))];
     const sessions = ["morning", "afternoon"];
     const rows = [];
@@ -166,9 +159,7 @@ export async function GET(req) {
                 let records = [];
                 matchedClasses.forEach(cls => {
                     records.push(
-                        ...attendance.filter(
-                            a => String(a.classId) === String(cls._id)
-                        )
+                        ...attendance.filter(a => String(a.classId) === String(cls._id))
                     );
                 });
 
@@ -182,21 +173,18 @@ export async function GET(req) {
 
                 if (cell.P !== "-") {
                     totalP += cell.P;
-                    totalCapacity += records.length * matchedClasses[0].totalStudents;
+                    totalCapacity += matchedClasses[0].totalStudents;
                 }
             });
 
             row.data["TOTAL"] = {
-                P: totalP,
+                P: Number(totalP.toFixed(2)),
                 "%": totalCapacity
                     ? Number(((totalP / totalCapacity) * 100).toFixed(2))
                     : 0
             };
 
-            // Only push row if it has relevant columns (handled by the loop) or if you want to filter empty rows
-            if (columns.length > 0) {
-                rows.push(row);
-            }
+            rows.push(row);
         });
     });
 
@@ -204,7 +192,7 @@ export async function GET(req) {
         success: true,
         filters: {
             department: departmentFilter,
-            year: yearFilter, // Return the applied filter
+            year: yearFilter,
             period,
             startDate,
             endDate

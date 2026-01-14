@@ -1,20 +1,12 @@
 "use client";
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import * as Dialog from "@radix-ui/react-dialog";
 
-// Colors for pie chart slices
 const COLORS = [
-    "#3b82f6", // Blue
-    "#10b981", // Emerald
-    "#f59e0b", // Amber
-    "#ef4444", // Red
-    "#6366f1", // Indigo
-    "#8b5cf6", // Violet
-    "#14b8a6", // Teal
+    "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#6366f1", "#8b5cf6", "#14b8a6",
 ];
 
-// Tooltip for pie chart slices
 const ClassTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
         return (
@@ -27,50 +19,50 @@ const ClassTooltip = ({ active, payload }) => {
     return null;
 };
 
-// Safely process events into class-wise counts
-const processClassData = (events = []) => {
-    const classEventsMap = new Map();
+// 🔥 UPDATED: Accepts dynamic 'department' and 'events' array
+export default function ClassesEvents({ department, events = [] }) {
 
-    events.forEach((event) => {
-        (event.classes || []).forEach((className) => {
-            const currentCount = classEventsMap.get(className) || 0;
-            classEventsMap.set(className, currentCount + 1);
+    // Process Data: Map events to classes (One event can belong to multiple classes)
+    const classData = useMemo(() => {
+        const classEventsMap = new Map();
+
+        events.forEach((event) => {
+            if (Array.isArray(event.classes)) {
+                event.classes.forEach((className) => {
+                    const currentCount = classEventsMap.get(className) || 0;
+                    classEventsMap.set(className, currentCount + 1);
+                });
+            }
         });
-    });
 
-    return Array.from(classEventsMap, ([name, value]) => ({ name, value }));
-};
+        return Array.from(classEventsMap, ([name, value]) => ({ name, value }));
+    }, [events]);
 
-export default function DepartmentClassEventsChart({ department, events = [] }) {
-    const classData = processClassData(events);
-
-    const [selectedClass, setSelectedClass] = React.useState(null);
+    const [selectedClass, setSelectedClass] = useState(null);
 
     const getClassEvents = (className) =>
-        events.filter((event) => event.classes.includes(className));
+        events.filter((event) => event.classes && event.classes.includes(className));
 
     const handleClassSliceClick = (data) => setSelectedClass(data.name);
-
     const handleDialogClose = () => setSelectedClass(null);
 
     if (!events || events.length === 0) {
         return (
-            <div className="p-6 text-center text-gray-500">
-                No event data available for the selected department/filters.
+            <div className="p-6 text-center text-gray-500 bg-white rounded-xl shadow-lg">
+                <h2 className="text-xl font-bold text-gray-700 mb-2">{department}</h2>
+                No event data available for the selected department.
             </div>
         );
     }
 
     return (
         <div className="p-6 bg-white rounded-xl shadow-lg w-full">
-            {/* Title only */}
             <div className="flex justify-center mb-4">
                 <h2 className="text-xl font-bold text-indigo-700">
                     {department} — Events by Class
                 </h2>
             </div>
 
-            {/* Horizontal scroll wrapper with hidden scrollbars */}
             <div className="w-full overflow-x-auto hide-scrollbar">
                 <div className="min-w-[600px] mx-auto flex justify-center">
                     <ResponsiveContainer width="100%" height={400}>
@@ -101,28 +93,23 @@ export default function DepartmentClassEventsChart({ department, events = [] }) 
                 </div>
             </div>
 
-            {/* Dialog for class event details */}
+            {/* Dialog */}
             <Dialog.Root open={!!selectedClass} onOpenChange={handleDialogClose}>
                 <Dialog.Portal>
                     <Dialog.Overlay className="fixed inset-0 bg-black/40" />
-                    <Dialog.Content className="fixed left-1/2 top-1/2 w-[90%] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg">
+                    <Dialog.Content className="fixed left-1/2 top-1/2 w-[90%] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white p-6 shadow-lg z-50">
                         <Dialog.Title className="text-lg font-semibold text-indigo-700">
                             Events for {selectedClass}
                         </Dialog.Title>
 
-                        {/* Scroll area with hidden scrollbar */}
                         <div className="mt-4 space-y-3 max-h-60 overflow-y-auto hide-scrollbar">
                             {getClassEvents(selectedClass).map((event, idx) => (
                                 <div
                                     key={idx}
                                     className="border-l-4 border-indigo-500 pl-3 py-1 bg-gray-50 rounded-r"
                                 >
-                                    <p className="font-semibold text-gray-800">
-                                        {event.event}
-                                    </p>
-                                    <p className="text-sm text-gray-600">
-                                        Date: {event.date}
-                                    </p>
+                                    <p className="font-semibold text-gray-800">{event.event}</p>
+                                    <p className="text-sm text-gray-600">Date: {event.date}</p>
                                 </div>
                             ))}
                         </div>
