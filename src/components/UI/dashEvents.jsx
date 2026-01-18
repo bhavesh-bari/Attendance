@@ -1,112 +1,141 @@
 "use client";
-import React from "react";
+import React, { useMemo } from "react";
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, ResponsiveContainer, LabelList,
 } from "recharts";
 
-const departmentColorPalette = [
-    "#1E90FF", "#28A745", "#FF8C00", "#8A2BE2", "#DC143C",
-    "#20B2AA", "#FF1493", "#6A5ACD", "#708090", "#A0522D",
+// --- Colors ---
+const DEPARTMENT_PALETTE = [
+    "#3B82F6", "#10B981", "#F59E0B", "#8B5CF6", "#EF4444",
+    "#EC4899", "#06B6D4", "#6366F1", "#F97316", "#64748B"
 ];
 
-const getDepartmentColors = (departments) => {
-    const deptColorMap = {};
-    departments.forEach((dept, index) => {
-        deptColorMap[dept] = departmentColorPalette[index % departmentColorPalette.length];
-    });
-    return deptColorMap;
+const getDepartmentColors = (depts) => {
+    const map = {};
+    depts.forEach((d, i) => map[d] = DEPARTMENT_PALETTE[i % DEPARTMENT_PALETTE.length]);
+    return map;
 };
 
-const CustomEventTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-        const department = payload[0].payload.department;
-        const eventCount = payload[0].value;
+// --- Main Component ---
+export default function EventDisplay({ data = [] }) {
+
+    // 1. Process Data
+    const { mode, formattedData, colorMap } = useMemo(() => {
+        if (!data || data.length === 0) return { mode: 'empty', formattedData: [] };
+
+        const isSingleDay = data[0].hasOwnProperty("eventName");
+        const depts = [...new Set(data.map((d) => d.department || "Unknown"))];
+
+        if (isSingleDay) {
+            return { mode: 'single', formattedData: data, colorMap: getDepartmentColors(depts) };
+        } else {
+            return {
+                mode: 'range',
+                formattedData: data.map(i => ({
+                    name: i.className,
+                    department: i.department || "Unknown",
+                    events_count: i.count
+                })),
+                colorMap: getDepartmentColors(depts)
+            };
+        }
+    }, [data]);
+
+    if (mode === 'empty') {
         return (
-            <div className="bg-white border rounded-lg shadow-md p-3 text-sm">
-                <p className="font-bold text-gray-800">Class: {label}</p>
-                <p className="text-gray-600 mb-1">Department: {department}</p>
-                <p className="mt-1" style={{ color: payload[0].fill }}>
-                    Total Events: <span className="font-semibold">{eventCount}</span>
-                </p>
+            <div className="w-full h-48 bg-gray-50 border-dashed border-2 border-gray-200 rounded-xl flex items-center justify-center text-gray-400">
+                No events found.
             </div>
         );
     }
-    return null;
-};
 
-export default function EventCountBarChart({ data = [] }) {
-    // 1. Process API Data
-    // API returns: { className, department, count }
-    // Chart expects: { name, department, events_count }
-    const formattedData = data.map(item => ({
-        name: item.className,
-        department: item.department || "Unknown",
-        events_count: item.count
-    }));
-
-    // 2. Color Logic
-    const deptNames = [...new Set(formattedData.map((d) => d.department))];
-    const deptColorMap = getDepartmentColors(deptNames);
-
-    // 3. Dynamic Width
-    const dynamicWidth = Math.max(900, formattedData.length * 35);
-
-    // Calc max for Y-Axis domain
-    const maxEvents = formattedData.reduce((max, item) => Math.max(max, item.events_count), 0);
-    const yAxisDomain = [0, maxEvents < 5 ? 5 : maxEvents + 2];
-
-    if (formattedData.length === 0) {
+    // 2. Single Day View (Cards)
+    if (mode === 'single') {
         return (
-            <div className="w-full h-[300px] bg-white p-4 rounded-xl shadow flex items-center justify-center text-gray-500">
-                No event data available for this selection.
+            <div className="w-full bg-white p-6 rounded-xl shadow">
+                <h2 className="text-lg font-bold mb-4">📅 Today's Events</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {formattedData.map((item, idx) => (
+                        <div key={idx} className="border-l-4 border bg-gray-50 p-4 rounded shadow-sm"
+                            style={{ borderColor: colorMap[item.department] }}>
+                            <h3 className="font-bold">{item.className}</h3>
+                            <p className="text-sm text-gray-500">{item.department}</p>
+                            <p className="mt-2 text-blue-600 font-medium">{item.eventName}</p>
+                        </div>
+                    ))}
+                </div>
             </div>
         );
     }
+
+    // 3. Range View (Chart) - FIXED VISUALS FOR MD+ SCREENS
+
+    // Logic: 
+    // If we have few items (<= 6), we CENTER the chart and give it a fixed width.
+    // If we have many items (> 6), we allow it to overflow and scroll.
+    const isScrollable = formattedData.length > 6;
+
+    // 120px per bar gives them room to breathe without being huge
+    const calculatedWidth = formattedData.length * 120;
+
+    const maxVal = formattedData.reduce((m, i) => Math.max(m, i.events_count), 0);
+    const yDomain = [0, maxVal < 5 ? 5 : maxVal + 2];
 
     return (
-        <div className="w-full md:h-[600px] h-[700px] bg-white p-4 rounded-xl shadow overflow-hidden">
-            <h2 className="text-xl font-semibold mb-4">Event Counts by Class 📊</h2>
+        <div className="w-full bg-white p-4 rounded-xl shadow border border-gray-100 flex flex-col">
+            <div className="flex justify-between items-center mb-4 px-2">
+                <h2 className="text-lg font-bold text-gray-800">📊 Event Frequency</h2>
+                <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                    Total: {formattedData.length}
+                </span>
+            </div>
 
-            <div className="w-full overflow-x-auto hide-scrollbar" style={{ height: "420px" }}>
-                <div style={{ minWidth: dynamicWidth, height: "100%" }}>
+
+            <div className={`w-full flex ${isScrollable ? 'overflow-x-auto justify-start' : 'overflow-hidden justify-center'}`}>
+
+
+                <div style={{ width: Math.max(calculatedWidth, 300), height: 400 }}>
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                             data={formattedData}
-                            barGap={0}
-                            margin={{ top: 30, right: 30, left: 20, bottom: 80 }}
-                            barCategoryGap="40%"
+                            margin={{ top: 20, right: 30, left: 0, bottom: 60 }}
+                            barCategoryGap="20%" // Tighter gap looks better
                         >
-                            <CartesianGrid strokeDasharray="3 3" />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis
                                 dataKey="name"
-                                interval={0}
                                 angle={-45}
                                 textAnchor="end"
-                                height={90}
-                                tick={{ fontSize: 11 }}
+                                interval={0}
+                                tick={{ fontSize: 12 }}
                             />
-                            <YAxis domain={yAxisDomain} allowDecimals={false} tick={{ fontSize: 12 }} />
-                            <Tooltip content={<CustomEventTooltip />} />
+                            <YAxis domain={yDomain} allowDecimals={false} />
+                            <Tooltip
+                                cursor={{ fill: '#f3f4f6' }}
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                            />
 
-                            <Bar dataKey="events_count" name="Events Count" radius={[5, 5, 0, 0]} barSize={25}>
-                                {formattedData.map((entry, i) => (
-                                    <Cell key={`event-cell-${i}`} fill={deptColorMap[entry.department] || "#888"} />
+                            <Bar
+                                dataKey="events_count"
+                                radius={[4, 4, 0, 0]}
+                                maxBarSize={60} // Prevents bars from becoming excessively fat
+                            >
+                                {formattedData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={colorMap[entry.department] || "#888"} />
                                 ))}
-                                <LabelList dataKey="events_count" position="top" formatter={(v) => v} style={{ fill: '#000000', fontWeight: 'bold', fontSize: 11 }} />
+                                <LabelList dataKey="events_count" position="top" style={{ fill: "#666", fontSize: 12, fontWeight: "bold" }} />
                             </Bar>
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
             </div>
 
-            <hr className="mb-2" />
-
-            <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 justify-center">
-                <span className="font-bold w-full text-center text-sm mb-2">Department Color Key:</span>
-                {deptNames.map((dept) => (
+            {/* Legend */}
+            <div className="flex flex-wrap justify-center gap-4 mt-4 pt-4 border-t border-gray-100">
+                {Object.keys(colorMap).map(dept => (
                     <div key={dept} className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded shadow-md" style={{ backgroundColor: deptColorMap[dept] }}></div>
-                        <span className="text-sm">{dept}</span>
+                        <span className="w-3 h-3 rounded-full" style={{ background: colorMap[dept] }}></span>
+                        <span className="text-xs font-medium text-gray-600">{dept}</span>
                     </div>
                 ))}
             </div>

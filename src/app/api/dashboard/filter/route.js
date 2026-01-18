@@ -15,7 +15,7 @@ export async function GET(req) {
         today.setHours(0, 0, 0, 0);
 
         /* ===============================
-           Date Filters
+           1. Robust Date Filters
         =============================== */
         switch (filter) {
             case "today":
@@ -34,14 +34,30 @@ export async function GET(req) {
                 break;
 
             case "date":
-                startDate = new Date(searchParams.get("date"));
+                const paramDate = searchParams.get("date");
+                if (!paramDate) throw new Error("Date parameter missing");
+                startDate = new Date(paramDate);
                 startDate.setHours(0, 0, 0, 0);
                 endDate = new Date(startDate);
                 break;
 
             case "range":
-                startDate = new Date(searchParams.get("from"));
-                endDate = new Date(searchParams.get("to"));
+                const fromParam = searchParams.get("from");
+                const toParam = searchParams.get("to");
+
+                if (!fromParam || !toParam) {
+                    // Fallback to this month if range is invalid, or throw error
+                    throw new Error("Start and End dates required for range");
+                }
+
+                startDate = new Date(fromParam);
+                endDate = new Date(toParam);
+
+                // Validate dates are real
+                if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                    throw new Error("Invalid date format provided");
+                }
+
                 startDate.setHours(0, 0, 0, 0);
                 endDate.setHours(0, 0, 0, 0);
                 break;
@@ -59,20 +75,21 @@ export async function GET(req) {
                 : {};
 
         /* ===============================
-           Fetch Data
+           2. Fetch Data
         =============================== */
         const [attendanceData, classes] = await Promise.all([
             Attendance.find(dateQuery),
             Class.find()
         ]);
 
+        // Create ID Map for fast lookup (Much safer than Name lookup)
         const classMap = {};
         classes.forEach(c => {
             classMap[c._id.toString()] = c;
         });
 
         /* =====================================================
-           1️⃣ DEPARTMENT ATTENDANCE (FIXED – AGGREGATED)
+           3. DEPARTMENT ATTENDANCE
         ===================================================== */
         const attendanceAgg = {};
 
@@ -101,36 +118,66 @@ export async function GET(req) {
         const departmentAttendance = Object.values(attendanceAgg).map(d => ({
             department: d.department,
             className: d.className,
-            morningPercent: (
-                (d.totalMorning / d.days / d.totalStudents) * 100
-            ).toFixed(1),
-            afternoonPercent: (
-                (d.totalAfternoon / d.days / d.totalStudents) * 100
-            ).toFixed(1)
+            morningPercent: ((d.totalMorning / d.days / d.totalStudents) * 100).toFixed(1),
+            afternoonPercent: ((d.totalAfternoon / d.days / d.totalStudents) * 100).toFixed(1)
         }));
 
         /* =====================================================
-           2️⃣ EVENT COUNTS (FIXED)
+           4. EVENT SECTION (FIXED & SAFER)
         ===================================================== */
-        const eventMap = {};
+        let eventResults = [];
+        const isSingleDay = filter === "today" || filter === "date";
 
-        attendanceData.forEach(d => {
-            if (d.isEvent) {
-                eventMap[d.className] = (eventMap[d.className] || 0) + 1;
-            }
-        });
+        if (isSingleDay) {
+            // Case A: Single Day -> Return Event Strings
+            attendanceData.forEach(d => {
+                if (d.isEvent) {
+                    const mName = d.MEventName || "";
+                    const aName = d.AEventName || "";
+                    let displayEventName = "";
 
-        const eventCounts = Object.entries(eventMap).map(([className, count]) => {
-            const cls = classes.find(c => c.name === className);
-            return {
+                    if (mName === aName) displayEventName = mName;
+                    else if (!mName) displayEventName = aName;
+                    else if (!aName) displayEventName = mName;
+                    else displayEventName = `${mName} and ${aName}`;
+
+                    eventResults.push({
+                        className: d.className,
+                        department: d.department, // Safely taken from Attendance Doc
+                        eventName: displayEventName
+                    });
+                }
+            });
+        } else {
+            // Case B: Range/Overall -> Return Counts (FIXED)
+            const eventMap = {};
+
+            attendanceData.forEach(d => {
+                if (d.isEvent) {
+                    const key = d.className;
+
+                    if (!eventMap[key]) {
+                        
+                        const clsInfo = classMap[d.classId?.toString()];
+                        eventMap[key] = {
+                            department: d.department || clsInfo?.department || "General",
+                            count: 0
+                        };
+                    }
+                    eventMap[key].count += 1;
+                }
+            });
+
+            // Convert map to array
+            eventResults = Object.entries(eventMap).map(([className, data]) => ({
                 className,
-                department: cls?.department,
-                count
-            };
-        });
+                department: data.department,
+                count: data.count
+            }));
+        }
 
         /* =====================================================
-           3️⃣ LEADERBOARD (ALREADY CORRECT – CLEANED)
+           5. LEADERBOARD
         ===================================================== */
         const leaderboardMap = {};
 
@@ -166,22 +213,20 @@ export async function GET(req) {
             }))
             .sort((a, b) => b.percentage - a.percentage);
 
-        /* ===============================
-           FINAL RESPONSE
-        =============================== */
         return NextResponse.json({
             success: true,
             filter,
             data: {
                 departmentAttendance,
-                eventCounts,
+                eventCounts: eventResults,
                 leaderboard
             }
         });
 
     } catch (error) {
+        console.error("API Error:", error); // Log error for debugging
         return NextResponse.json(
-            { success: false, error: error.message },
+            { success: false, error: error.message || "Internal Server Error" },
             { status: 500 }
         );
     }

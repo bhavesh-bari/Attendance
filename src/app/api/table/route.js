@@ -93,19 +93,34 @@ export async function GET(req) {
     /* ================= HELPERS ================= */
 
     const isMultiDay = ["month", "overall", "range"].includes(period);
+    // Logic: Events are calculated ONLY for single-day views
+    const includeEvents = period === "today" || period === "date";
+
+    const getShiftEvent = (records, session) => {
+        if (!includeEvents) return "";
+
+        let eventName = "";
+        records.forEach(r => {
+            if (!r.isEvent) return;
+            if (session === "morning" && r.MEventName) eventName = r.MEventName;
+            if (session === "afternoon" && r.AEventName) eventName = r.AEventName;
+        });
+        return eventName;
+    };
 
     const calcCell = (records, session, totalStudents) => {
-        if (!records.length) return { P: 0, "%": 0 };
+        if (!records.length) {
+            return includeEvents
+                ? { P: 0, "%": 0, eventName: "" }
+                : { P: 0, "%": 0 };
+        }
 
         let present = 0;
         const uniqueDays = new Set();
 
         records.forEach(r => {
             uniqueDays.add(new Date(r.date).toDateString());
-            present +=
-                session === "morning"
-                    ? r.MornCount || 0
-                    : r.AftCount || 0;
+            present += session === "morning" ? r.MornCount || 0 : r.AftCount || 0;
         });
 
         const days = isMultiDay ? uniqueDays.size || 1 : 1;
@@ -116,10 +131,16 @@ export async function GET(req) {
             ? Number(((avgPresent / capacityPerDay) * 100).toFixed(2))
             : 0;
 
-        return {
+        const cell = {
             P: Number(avgPresent.toFixed(2)),
             "%": percent
         };
+
+        if (includeEvents) {
+            cell.eventName = getShiftEvent(records, session);
+        }
+
+        return cell;
     };
 
     /* ================= ROWS ================= */
@@ -145,14 +166,13 @@ export async function GET(req) {
                 );
 
                 const matchedClasses = classes.filter(
-                    c =>
-                        c.department === dept &&
-                        c.year === year &&
-                        c.division === division
+                    c => c.department === dept && c.year === year && c.division === division
                 );
 
                 if (!matchedClasses.length) {
-                    row.data[col] = { P: "-", "%": "-" };
+                    row.data[col] = includeEvents
+                        ? { P: "-", "%": "-", eventName: "" }
+                        : { P: "-", "%": "-" };
                     return;
                 }
 
@@ -163,12 +183,7 @@ export async function GET(req) {
                     );
                 });
 
-                const cell = calcCell(
-                    records,
-                    session,
-                    matchedClasses[0].totalStudents
-                );
-
+                const cell = calcCell(records, session, matchedClasses[0].totalStudents);
                 row.data[col] = cell;
 
                 if (cell.P !== "-") {
@@ -199,7 +214,8 @@ export async function GET(req) {
         },
         departments: alldepartments,
         columns: [...columns, "TOTAL"],
-        subColumns: ["P", "%"],
+        // DYNAMIC SUBCOLUMNS: Send "Event" only if applicable
+        subColumns: includeEvents ? ["P", "%", "Event"] : ["P", "%"],
         rows
     });
 }
