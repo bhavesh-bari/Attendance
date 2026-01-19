@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import {
     Sun,
     Moon,
@@ -13,12 +14,11 @@ import {
     LayoutDashboard,
     Loader2,
     ChevronRight,
-    AlertCircle // Imported for error display
+    AlertCircle
 } from "lucide-react";
 
 /* ---------------- HELPER COMPONENTS ---------------- */
 
-// Updated to accept error prop
 const InputGroup = ({ label, icon: Icon, children, error, className = "" }) => (
     <div className={`space-y-1.5 ${className}`}>
         <div className="flex justify-between items-center">
@@ -26,7 +26,6 @@ const InputGroup = ({ label, icon: Icon, children, error, className = "" }) => (
                 {Icon && <Icon size={14} />}
                 {label}
             </label>
-            {/* Show error message if exists */}
             {error && (
                 <span className="text-xs text-red-500 font-medium flex items-center gap-1 animate-pulse">
                     <AlertCircle size={12} /> {error}
@@ -40,17 +39,20 @@ const InputGroup = ({ label, icon: Icon, children, error, className = "" }) => (
 /* ---------------- MAIN COMPONENT ---------------- */
 
 const AttendanceComponent = () => {
+
+    const { data: session } = useSession();
+
     // State
-    const [department, setDepartment] = useState("all");
+    const [department, setDepartment] = useState(null);
     const [classes, setClasses] = useState([]);
     const [records, setRecords] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
 
-    /* --- NEW: Validation States --- */
-    const [selectedClassLimit, setSelectedClassLimit] = useState(0); // Stores totalStudents
-    const [errors, setErrors] = useState({}); // Stores validation errors
+    // Validation States
+    const [selectedClassLimit, setSelectedClassLimit] = useState(0);
+    const [errors, setErrors] = useState({});
 
     // Form State
     const [form, setForm] = useState({
@@ -69,6 +71,17 @@ const AttendanceComponent = () => {
         month: "long",
     });
 
+    /* ---------------- LOGIC: AUTO-SET DEPARTMENT ---------------- */
+    useEffect(() => {
+        if (!session?.user) return;
+
+        if (session.user.role === "AMC") {
+            setDepartment("all");
+        } else if (session.user.role === "Department Dean") {
+            setDepartment(session.user.department);
+        }
+    }, [session]);
+
     /* ---------------- FETCH DATA ---------------- */
 
     const fetchClasses = async () => {
@@ -79,7 +92,6 @@ const AttendanceComponent = () => {
                 body: JSON.stringify({ department }),
             });
             const data = await res.json();
-            // Assuming data.classes contains [{ _id, name, department, totalStudents }, ...]
             if (data.success) setClasses(data.classes);
         } catch (error) {
             console.error("Failed to fetch classes");
@@ -103,32 +115,28 @@ const AttendanceComponent = () => {
         }
     };
 
+    // Only fetch when department is set
     useEffect(() => {
+        if (!department) return;
+
         fetchClasses();
         fetchToday();
     }, [department]);
 
     /* ---------------- HANDLERS ---------------- */
 
-    /* --- UPDATED: Validation Logic inside handleChange --- */
     const handleChange = (e) => {
         const { name, value } = e.target;
-
-        // 1. Update form state immediately
         setForm((prev) => ({ ...prev, [name]: value }));
 
-        // 2. Perform Validation if the field is a count
         if (name === "MornCount" || name === "AftCount") {
             const numValue = Number(value);
-
-            // If class is selected and value exceeds limit
             if (selectedClassLimit > 0 && numValue > selectedClassLimit) {
                 setErrors(prev => ({
                     ...prev,
                     [name]: `Exceeds total students (${selectedClassLimit})`
                 }));
             } else {
-                // Clear error if valid
                 setErrors(prev => {
                     const newErrors = { ...prev };
                     delete newErrors[name];
@@ -138,7 +146,6 @@ const AttendanceComponent = () => {
         }
     };
 
-    /* --- UPDATED: Capture totalStudents on Class Change --- */
     const handleClassChange = (e) => {
         const cls = classes.find((c) => c._id === e.target.value);
         if (cls) {
@@ -146,16 +153,10 @@ const AttendanceComponent = () => {
                 ...prev,
                 classId: cls._id,
                 className: cls.name,
-                // Optional: Reset counts when class changes to avoid stale validation
                 MornCount: "",
                 AftCount: ""
             }));
-
-            // Set the limit for validation
-            // IMPORTANT: Ensure your API returns 'totalStudents' key in the class object
             setSelectedClassLimit(cls.totalStudents || 0);
-
-            // Clear previous errors
             setErrors({});
         } else {
             setForm(prev => ({ ...prev, classId: "", className: "" }));
@@ -166,12 +167,9 @@ const AttendanceComponent = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
-        // Final Safety Check
         if (Object.keys(errors).length > 0) return;
 
         setIsSaving(true);
-
         try {
             await fetch("/api/attendance", {
                 method: "POST",
@@ -196,8 +194,8 @@ const AttendanceComponent = () => {
                 AftCount: "",
                 AEventName: "",
             });
-            setSelectedClassLimit(0); // Reset limit
-            setErrors({}); // Reset errors
+            setSelectedClassLimit(0);
+            setErrors({});
             fetchToday();
         } catch (error) {
             console.error("Error saving");
@@ -230,23 +228,7 @@ const AttendanceComponent = () => {
                     </div>
                 </div>
 
-                {/* --- DEPARTMENT TABS --- */}
-                <div className="flex flex-wrap gap-2">
-                    {["all", "CSE", "ECE", "MECH"].map((dept) => (
-                        <button
-                            key={dept}
-                            onClick={() => setDepartment(dept)}
-                            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center gap-2
-                ${department === dept
-                                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-200 scale-105"
-                                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300"
-                                }`}
-                        >
-                            {dept === "all" ? <Building2 size={16} /> : null}
-                            {dept === "all" ? "All Departments" : dept}
-                        </button>
-                    ))}
-                </div>
+
 
                 <div className="grid lg:grid-cols-12 gap-8">
 
@@ -274,7 +256,6 @@ const AttendanceComponent = () => {
                                 <div className="space-y-2">
                                     <div className="flex justify-between">
                                         <label className="text-sm font-bold text-gray-700">Select Class</label>
-                                        {/* Display Max Capacity Helper */}
                                         {selectedClassLimit > 0 && (
                                             <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
                                                 Max Capacity: {selectedClassLimit}
@@ -310,18 +291,17 @@ const AttendanceComponent = () => {
                                         <InputGroup
                                             label="Headcount"
                                             icon={Users}
-                                            error={errors.MornCount} // Pass Error
+                                            error={errors.MornCount}
                                         >
                                             <input
                                                 type="number"
                                                 name="MornCount"
                                                 min="0"
-                                                max={selectedClassLimit || undefined} // HTML5 validation constraint
+                                                max={selectedClassLimit || undefined}
                                                 placeholder="0"
                                                 value={form.MornCount}
                                                 onChange={handleChange}
                                                 disabled={!form.classId}
-                                                // Conditional styling based on error
                                                 className={`w-full p-3 bg-white border rounded-lg focus:ring-2 outline-none text-2xl font-bold text-gray-700 text-center placeholder:text-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed
                                                 ${errors.MornCount
                                                         ? "border-red-300 focus:ring-red-400 text-red-600"
@@ -352,7 +332,7 @@ const AttendanceComponent = () => {
                                         <InputGroup
                                             label="Headcount"
                                             icon={Users}
-                                            error={errors.AftCount} // Pass Error
+                                            error={errors.AftCount}
                                         >
                                             <input
                                                 type="number"
@@ -389,10 +369,9 @@ const AttendanceComponent = () => {
                             <div className="p-6 bg-gray-50 border-t border-gray-100">
                                 <button
                                     type="submit"
-                                    // Disable if saving, no class selected, OR validation errors exist
                                     disabled={isSaving || !form.classId || Object.keys(errors).length > 0}
                                     className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-3 transition-all transform active:scale-[0.99]
-                    ${isSaving || !form.classId || Object.keys(errors).length > 0
+                                    ${isSaving || !form.classId || Object.keys(errors).length > 0
                                             ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                                             : "bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-indigo-200"
                                         }`}
@@ -406,7 +385,6 @@ const AttendanceComponent = () => {
 
                     {/* --- RIGHT: RECORDS LIST (Unchanged) --- */}
                     <div className="lg:col-span-5 space-y-6">
-                        {/* ... (Keep existing records list code exactly as is) ... */}
                         <div className="flex items-center justify-between">
                             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                 <History className="text-gray-400" />

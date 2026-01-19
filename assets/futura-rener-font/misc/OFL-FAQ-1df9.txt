@@ -230,6 +230,6 @@ If you want to release your fonts under the OFL, you only need to do the followi
 7.5  We also highly recommend you include the relevant practical documentation on the license by putting the OFL-FAQ in your package.
 7.6  If you wish, you can use the OFL Graphics on your web page.
 
-That's all. If you have any more questions please get in touch with us.
+That's all. If you have any more questions please  touch with us.
 
 
