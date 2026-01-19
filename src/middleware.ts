@@ -19,10 +19,14 @@ export default withAuth({
             return true;
         },
     },
+    pages: {
+        signIn: "/auth",
+    },
 });
 
 export const config = {
     matcher: [
+        "/",
         "/dashboard/:path*",
         "/fill/:path*",
         "/edit/:path*",
