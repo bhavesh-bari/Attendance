@@ -3,13 +3,20 @@ import { connectDB } from "@/lib/mongodb";
 import Attendance from "@/models/Attendance";
 import Class from "@/models/Class";
 
+function getAcademicYear(date = new Date()) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    return month >= 5
+        ? `${year}-${String(year + 1).slice(2)}`
+        : `${year - 1}-${String(year).slice(2)}`;
+}
+
 export async function GET() {
     try {
         await connectDB();
 
-        /* ===============================
-           Dates (AUTO – no filters)
-        =============================== */
+        const academicYear = getAcademicYear();
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -18,42 +25,24 @@ export async function GET() {
 
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
-        /* ===============================
-           Class Map
-        =============================== */
-        const classes = await Class.find();
+        const classes = await Class.find({ academicYear });
         const classMap = {};
-        classes.forEach(c => {
-            classMap[c._id.toString()] = c;
-        });
+        classes.forEach(c => (classMap[c._id.toString()] = c));
 
-        /* ===============================
-           Helper: Attendance %
-        =============================== */
-        const calcPercent = (doc, total) => {
-            const avg = (doc.MornCount + doc.AftCount) / 2;
-            return total ? (avg / total) * 100 : 0;
-        };
+        const calcPercent = (d, total) =>
+            total ? ((d.MornCount + d.AftCount) / 2 / total) * 100 : 0;
 
-        /* ===============================
-           TODAY Attendance
-        =============================== */
-        const todayData = await Attendance.find({ date: today });
-        const yesterdayData = await Attendance.find({ date: yesterday });
+        const todayData = await Attendance.find({ date: today, academicYear });
+        const yesterdayData = await Attendance.find({ date: yesterday, academicYear });
 
         const todayAvg =
-            todayData.reduce((sum, d) =>
-                sum + calcPercent(d, classMap[d.classId]?.totalStudents), 0
-            ) / (todayData.length || 1);
+            todayData.reduce((s, d) => s + calcPercent(d, classMap[d.classId]?.totalStudents), 0) /
+            (todayData.length || 1);
 
         const yesterdayAvg =
-            yesterdayData.reduce((sum, d) =>
-                sum + calcPercent(d, classMap[d.classId]?.totalStudents), 0
-            ) / (yesterdayData.length || 1);
+            yesterdayData.reduce((s, d) => s + calcPercent(d, classMap[d.classId]?.totalStudents), 0) /
+            (yesterdayData.length || 1);
 
-        /* ===============================
-           Best & Lowest (TODAY)
-        =============================== */
         let bestClass = null;
         let worstClass = null;
 
@@ -67,31 +56,22 @@ export async function GET() {
                 worstClass = { ...d.toObject(), percent };
         });
 
-        /* ===============================
-           MONTHLY DATA (Current Month)
-        =============================== */
         const monthData = await Attendance.find({
+            academicYear,
             date: { $gte: monthStart, $lte: today }
         });
 
         const monthlyAvg =
-            monthData.reduce((sum, d) =>
-                sum + calcPercent(d, classMap[d.classId]?.totalStudents), 0
-            ) / (monthData.length || 1);
+            monthData.reduce((s, d) => s + calcPercent(d, classMap[d.classId]?.totalStudents), 0) /
+            (monthData.length || 1);
 
-        /* ===============================
-           UPCOMING EVENT
-        =============================== */
         const upcomingEvent = await Attendance.findOne({
+            academicYear,
             date: { $gt: today },
             isEvent: true
         }).sort({ date: 1 });
 
-        /* ===============================
-           MOST EVENTS (THIS MONTH)
-        =============================== */
         const eventCounts = {};
-
         monthData.forEach(d => {
             if (d.isEvent) {
                 const dept = classMap[d.classId]?.department;
@@ -99,15 +79,11 @@ export async function GET() {
             }
         });
 
-        const mostEventsDept = Object.entries(eventCounts).sort(
-            (a, b) => b[1] - a[1]
-        )[0];
+        const mostEventsDept = Object.entries(eventCounts).sort((a, b) => b[1] - a[1])[0];
 
-        /* ===============================
-           FINAL RESPONSE
-        =============================== */
         return NextResponse.json({
             success: true,
+            academicYear,
             dashboard: {
                 todayOverall: {
                     percentage: todayAvg.toFixed(1),

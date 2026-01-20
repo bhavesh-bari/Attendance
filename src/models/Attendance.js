@@ -19,15 +19,23 @@ const AttendanceSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+
     department: {
       type: String,
       required: true,
     },
+
+    // ✅ NEW FIELD
+    academicYear: {
+      type: String,
+      required: true,
+      index: true,
+    },
+
     MornCount: { type: Number, default: 0 },
     AftCount: { type: Number, default: 0 },
 
     isEvent: { type: Boolean, default: false },
-
     MEventName: { type: String, default: "" },
     AEventName: { type: String, default: "" },
   },
@@ -35,7 +43,7 @@ const AttendanceSchema = new mongoose.Schema(
 );
 
 AttendanceSchema.index(
-  { date: 1, classId: 1 },
+  { date: 1, classId: 1, academicYear: 1 },
   { unique: true }
 );
 

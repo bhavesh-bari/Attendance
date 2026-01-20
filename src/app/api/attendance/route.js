@@ -2,12 +2,19 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Attendance from "@/models/Attendance";
 
+function getAcademicYear(date = new Date()) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    return month >= 5
+        ? `${year}-${String(year + 1).slice(2)}`
+        : `${year - 1}-${String(year).slice(2)}`;
+}
+
 export async function POST(req) {
     try {
         await connectDB();
 
         const body = await req.json();
-   
         const {
             date,
             classId,
@@ -19,7 +26,6 @@ export async function POST(req) {
             AEventName = ""
         } = body;
 
-        // ✅ Required validation
         if (!date || !classId || !className || !department) {
             return NextResponse.json(
                 {
@@ -30,24 +36,24 @@ export async function POST(req) {
             );
         }
 
-        // ✅ Normalize date (midnight)
         const normalizedDate = new Date(date);
         normalizedDate.setHours(0, 0, 0, 0);
 
-        // ✅ Event detection
+        const academicYear = getAcademicYear(normalizedDate);
         const isEvent = Boolean(MEventName || AEventName);
 
-        // ✅ UPSERT (update if exists, else insert)
         const attendance = await Attendance.findOneAndUpdate(
             {
                 date: normalizedDate,
-                classId
+                classId,
+                academicYear
             },
             {
                 date: normalizedDate,
                 classId,
                 className,
                 department,
+                academicYear,
                 MornCount,
                 AftCount,
                 MEventName,
@@ -69,7 +75,6 @@ export async function POST(req) {
     } catch (error) {
         console.error("❌ Attendance POST error:", error);
 
-        // Duplicate key error (unique index)
         if (error.code === 11000) {
             return NextResponse.json(
                 {

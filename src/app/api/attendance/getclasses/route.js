@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Class from "@/models/Class";
 
+function getAcademicYear(date = new Date()) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    return month >= 5
+        ? `${year}-${String(year + 1).slice(2)}`
+        : `${year - 1}-${String(year).slice(2)}`;
+}
+
 export async function POST(req) {
     try {
         await connectDB();
@@ -9,20 +17,23 @@ export async function POST(req) {
         const body = await req.json();
         const { department } = body;
 
+        const academicYear = getAcademicYear();
+
         let classes;
 
-        // ALL departments
+        // ✅ ALL departments
         if (!department || department === "all") {
-            classes = await Class.find({});
+            classes = await Class.find({ academicYear });
         }
-        // SINGLE or MULTIPLE departments
+        // ✅ SINGLE or MULTIPLE departments
         else {
             const departments = Array.isArray(department)
                 ? department
                 : [department];
 
             classes = await Class.find({
-                department: { $in: departments }
+                department: { $in: departments },
+                academicYear
             });
         }
 
@@ -30,7 +41,7 @@ export async function POST(req) {
             {
                 success: true,
                 count: classes.length,
-                classes,
+                classes
             },
             { status: 200 }
         );

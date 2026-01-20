@@ -2,27 +2,45 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Class from "@/models/Class";
 
+function getAcademicYear(date = new Date()) {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  return month >= 5
+    ? `${year}-${String(year + 1).slice(2)}`
+    : `${year - 1}-${String(year).slice(2)}`;
+}
+
+/* ================= POST ================= */
 export async function POST(req) {
   try {
     await connectDB();
 
     const body = await req.json();
     const { dept, year, div, numberOfStudents } = body;
+
     const yearNumber = parseInt(year);
+    const academicYear = getAcademicYear();
 
     const name = `${dept}${yearNumber}_${div}`;
-    const existingClass = await Class.findOne({ name });
+
+    const existingClass = await Class.findOne({
+      name,
+      academicYear
+    });
+
     if (existingClass) {
       return NextResponse.json(
-        { success: false, error: "Class with this name already exists. Update What you want" },
+        { success: false, error: "Class already exists for this academic year" },
         { status: 400 }
       );
     }
+
     const newClass = await Class.create({
       name,
       department: dept,
       year: yearNumber,
       division: div,
+      academicYear,
       totalStudents: numberOfStudents
     });
 
@@ -30,6 +48,7 @@ export async function POST(req) {
       { success: true, class: newClass },
       { status: 201 }
     );
+
   } catch (error) {
     console.error("POST ERROR:", error);
     return NextResponse.json(
@@ -38,6 +57,8 @@ export async function POST(req) {
     );
   }
 }
+
+/* ================= PUT ================= */
 export async function PUT(req) {
   try {
     await connectDB();
@@ -53,11 +74,19 @@ export async function PUT(req) {
     }
 
     const yearNumber = parseInt(year);
+    const academicYear = getAcademicYear();
+
     const name = `${dept}${yearNumber}_${div}`;
-    const nameExists = await Class.findOne({ name, _id: { $ne: id } });
+
+    const nameExists = await Class.findOne({
+      name,
+      academicYear,
+      _id: { $ne: id }
+    });
+
     if (nameExists) {
       return NextResponse.json(
-        { success: false, error: "Another class with this name already exists" },
+        { success: false, error: "Another class exists in this academic year" },
         { status: 400 }
       );
     }
@@ -69,6 +98,7 @@ export async function PUT(req) {
         department: dept,
         year: yearNumber,
         division: div,
+        academicYear,
         totalStudents: numberOfStudents
       },
       { new: true }
@@ -94,6 +124,8 @@ export async function PUT(req) {
     );
   }
 }
+
+/* ================= DELETE ================= */
 export async function DELETE(req) {
   try {
     await connectDB();
@@ -130,12 +162,21 @@ export async function DELETE(req) {
     );
   }
 }
+
+/* ================= GET ================= */
 export async function GET(req) {
   try {
     await connectDB();
-    const classes = await Class.find().sort({ createdAt: -1 });
-    const totalClasses = await Class.countDocuments();
+
+    const academicYear = getAcademicYear();
+
+    const classes = await Class.find({ academicYear })
+      .sort({ createdAt: -1 });
+
+    const totalClasses = await Class.countDocuments({ academicYear });
+
     const totalStudents = await Class.aggregate([
+      { $match: { academicYear } },
       {
         $group: {
           _id: null,
@@ -143,11 +184,20 @@ export async function GET(req) {
         }
       }
     ]);
-    const totaldepartments = await Class.distinct("department");
+
+    const totaldepartments = await Class.distinct("department", { academicYear });
+
     return NextResponse.json(
-      { success: true, classes, totalClasses, totalStudents, totaldepartments: totaldepartments.length },
+      {
+        success: true,
+        classes,
+        totalClasses,
+        totalStudents,
+        totaldepartments: totaldepartments.length
+      },
       { status: 200 }
     );
+
   } catch (error) {
     console.error("GET ERROR:", error);
     return NextResponse.json(

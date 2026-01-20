@@ -3,6 +3,18 @@ import { connectDB } from "@/lib/mongodb";
 import Attendance from "@/models/Attendance";
 import Class from "@/models/Class";
 
+/* =======================
+   ACADEMIC YEAR HELPER
+======================= */
+function getAcademicYear(date = new Date()) {
+  const year = date.getFullYear();
+  const month = date.getMonth(); // June = 5
+
+  return month >= 5
+    ? `${year}-${String((year + 1) % 100).padStart(2, "0")}`
+    : `${year - 1}-${String(year % 100).padStart(2, "0")}`;
+}
+
 export async function GET(req) {
   try {
     await connectDB();
@@ -19,6 +31,9 @@ export async function GET(req) {
     const compareType = searchParams.get("compareType");
     const left = searchParams.get("left");
     const right = searchParams.get("right");
+
+    const academicYear =
+      searchParams.get("academicYear") || getAcademicYear();
 
     /* =======================
        DATE LOGIC
@@ -50,11 +65,11 @@ export async function GET(req) {
         : {};
 
     /* =======================
-       FETCH DATA
+       FETCH DATA (ACADEMIC SAFE)
     ======================= */
     const [attendance, classes] = await Promise.all([
       Attendance.find(dateQuery),
-      Class.find({})
+      Class.find({ academicYear })
     ]);
 
     const classMap = {};
@@ -102,6 +117,7 @@ export async function GET(req) {
         const buildDept = dept => {
           const deptClasses = classes.filter(c => c.department === dept);
           const ids = deptClasses.map(c => c._id.toString());
+
           const records = attendance.filter(a =>
             ids.includes(a.classId?.toString())
           );
@@ -248,7 +264,7 @@ export async function GET(req) {
     }
 
     /* =====================================================
-       NORMAL ANALYTICS (UNCHANGED)
+       NORMAL ANALYTICS
     ===================================================== */
     const filteredClasses =
       scope === "department" && department
@@ -274,12 +290,8 @@ export async function GET(req) {
       };
 
       classStats[cls.name].total += Number(calcAttendance([a]));
-      classStats[cls.name].mornTotal += Number(
-        calcAttendance([a], "morning")
-      );
-      classStats[cls.name].aftTotal += Number(
-        calcAttendance([a], "afternoon")
-      );
+      classStats[cls.name].mornTotal += Number(calcAttendance([a], "morning"));
+      classStats[cls.name].aftTotal += Number(calcAttendance([a], "afternoon"));
       classStats[cls.name].count++;
 
       if (a.isEvent) {
@@ -306,6 +318,7 @@ export async function GET(req) {
 
     return NextResponse.json({
       success: true,
+      academicYear,
       filters: {
         scope,
         department,

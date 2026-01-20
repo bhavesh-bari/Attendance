@@ -6,6 +6,14 @@ import Class from "@/models/Class";
 const YEAR_MAP = { 1: "FE", 2: "SE", 3: "TE", 4: "BE" };
 const REVERSE_YEAR_MAP = { FE: 1, SE: 2, TE: 3, BE: 4 };
 
+function getAcademicYear(date = new Date()) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    return month >= 5
+        ? `${year}-${String(year + 1).slice(2)}`
+        : `${year - 1}-${String(year).slice(2)}`;
+}
+
 export async function GET(req) {
     await connectDB();
 
@@ -20,6 +28,9 @@ export async function GET(req) {
     const toParam = searchParams.get("to");
 
     const alldepartments = await Class.distinct("department");
+
+    /* ================= ACADEMIC YEAR ================= */
+    const academicYear = getAcademicYear();
 
     /* ================= DATE FILTER ================= */
     let startDate = null;
@@ -63,12 +74,16 @@ export async function GET(req) {
 
     const dateQuery =
         startDate && endDate
-            ? { date: { $gte: startDate, $lte: endDate } }
-            : {};
+            ? { date: { $gte: startDate, $lte: endDate }, academicYear }
+            : { academicYear };
 
     /* ================= CLASS QUERY ================= */
-    const classQuery = {};
-    if (departmentFilter !== "ALL") classQuery.department = departmentFilter;
+    const classQuery = { academicYear };
+
+    if (departmentFilter !== "ALL") {
+        classQuery.department = departmentFilter;
+    }
+
     if (yearFilter !== "ALL" && REVERSE_YEAR_MAP[yearFilter]) {
         classQuery.year = REVERSE_YEAR_MAP[yearFilter];
     }
@@ -91,14 +106,11 @@ export async function GET(req) {
     });
 
     /* ================= HELPERS ================= */
-
     const isMultiDay = ["month", "overall", "range"].includes(period);
-    // Logic: Events are calculated ONLY for single-day views
     const includeEvents = period === "today" || period === "date";
 
     const getShiftEvent = (records, session) => {
         if (!includeEvents) return "";
-
         let eventName = "";
         records.forEach(r => {
             if (!r.isEvent) return;
@@ -120,13 +132,15 @@ export async function GET(req) {
 
         records.forEach(r => {
             uniqueDays.add(new Date(r.date).toDateString());
-            present += session === "morning" ? r.MornCount || 0 : r.AftCount || 0;
+            present += session === "morning"
+                ? r.MornCount || 0
+                : r.AftCount || 0;
         });
 
         const days = isMultiDay ? uniqueDays.size || 1 : 1;
         const avgPresent = present / days;
 
-        const capacityPerDay = totalStudents * records.length / days;
+        const capacityPerDay = (totalStudents * records.length) / days;
         const percent = capacityPerDay
             ? Number(((avgPresent / capacityPerDay) * 100).toFixed(2))
             : 0;
@@ -166,7 +180,10 @@ export async function GET(req) {
                 );
 
                 const matchedClasses = classes.filter(
-                    c => c.department === dept && c.year === year && c.division === division
+                    c =>
+                        c.department === dept &&
+                        c.year === year &&
+                        c.division === division
                 );
 
                 if (!matchedClasses.length) {
@@ -179,11 +196,18 @@ export async function GET(req) {
                 let records = [];
                 matchedClasses.forEach(cls => {
                     records.push(
-                        ...attendance.filter(a => String(a.classId) === String(cls._id))
+                        ...attendance.filter(
+                            a => String(a.classId) === String(cls._id)
+                        )
                     );
                 });
 
-                const cell = calcCell(records, session, matchedClasses[0].totalStudents);
+                const cell = calcCell(
+                    records,
+                    session,
+                    matchedClasses[0].totalStudents
+                );
+
                 row.data[col] = cell;
 
                 if (cell.P !== "-") {
@@ -205,6 +229,7 @@ export async function GET(req) {
 
     return NextResponse.json({
         success: true,
+        academicYear,
         filters: {
             department: departmentFilter,
             year: yearFilter,
@@ -214,7 +239,6 @@ export async function GET(req) {
         },
         departments: alldepartments,
         columns: [...columns, "TOTAL"],
-        // DYNAMIC SUBCOLUMNS: Send "Event" only if applicable
         subColumns: includeEvents ? ["P", "%", "Event"] : ["P", "%"],
         rows
     });

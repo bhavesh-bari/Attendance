@@ -3,9 +3,19 @@ import { connectDB } from "@/lib/mongodb";
 import Attendance from "@/models/Attendance";
 import Class from "@/models/Class";
 
+function getAcademicYear(date = new Date()) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    return month >= 5
+        ? `${year}-${String(year + 1).slice(2)}`
+        : `${year - 1}-${String(year).slice(2)}`;
+}
+
 export async function GET(req) {
     try {
         await connectDB();
+
+        const academicYear = getAcademicYear();
 
         const { searchParams } = new URL(req.url);
         const filter = searchParams.get("filter");
@@ -33,34 +43,32 @@ export async function GET(req) {
                 endDate = null;
                 break;
 
-            case "date":
+            case "date": {
                 const paramDate = searchParams.get("date");
                 if (!paramDate) throw new Error("Date parameter missing");
                 startDate = new Date(paramDate);
                 startDate.setHours(0, 0, 0, 0);
                 endDate = new Date(startDate);
                 break;
+            }
 
-            case "range":
+            case "range": {
                 const fromParam = searchParams.get("from");
                 const toParam = searchParams.get("to");
 
-                if (!fromParam || !toParam) {
-                    // Fallback to this month if range is invalid, or throw error
+                if (!fromParam || !toParam)
                     throw new Error("Start and End dates required for range");
-                }
 
                 startDate = new Date(fromParam);
                 endDate = new Date(toParam);
 
-                // Validate dates are real
-                if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()))
                     throw new Error("Invalid date format provided");
-                }
 
                 startDate.setHours(0, 0, 0, 0);
                 endDate.setHours(0, 0, 0, 0);
                 break;
+            }
 
             default:
                 return NextResponse.json(
@@ -71,26 +79,25 @@ export async function GET(req) {
 
         const dateQuery =
             startDate && endDate
-                ? { date: { $gte: startDate, $lte: endDate } }
-                : {};
+                ? { date: { $gte: startDate, $lte: endDate }, academicYear }
+                : { academicYear };
 
         /* ===============================
-           2. Fetch Data
+           2. Fetch Data (UNCHANGED LOGIC)
         =============================== */
         const [attendanceData, classes] = await Promise.all([
             Attendance.find(dateQuery),
-            Class.find()
+            Class.find({ academicYear })
         ]);
 
-        // Create ID Map for fast lookup (Much safer than Name lookup)
         const classMap = {};
         classes.forEach(c => {
             classMap[c._id.toString()] = c;
         });
 
-        /* =====================================================
-           3. DEPARTMENT ATTENDANCE
-        ===================================================== */
+        /* ===============================
+           3. Department Attendance
+        =============================== */
         const attendanceAgg = {};
 
         attendanceData.forEach(d => {
@@ -122,72 +129,62 @@ export async function GET(req) {
             afternoonPercent: ((d.totalAfternoon / d.days / d.totalStudents) * 100).toFixed(1)
         }));
 
-        /* =====================================================
-           4. EVENT SECTION (FIXED & SAFER)
-        ===================================================== */
+        /* ===============================
+           4. Events (UNCHANGED)
+        =============================== */
         let eventResults = [];
         const isSingleDay = filter === "today" || filter === "date";
 
         if (isSingleDay) {
-            // Case A: Single Day -> Return Event Strings
             attendanceData.forEach(d => {
                 if (d.isEvent) {
-                    const mName = d.MEventName || "";
-                    const aName = d.AEventName || "";
-                    let displayEventName = "";
-
-                    if (mName === aName) displayEventName = mName;
-                    else if (!mName) displayEventName = aName;
-                    else if (!aName) displayEventName = mName;
-                    else displayEventName = `${mName} and ${aName}`;
+                    const m = d.MEventName || "";
+                    const a = d.AEventName || "";
+                    const name = m === a ? m : !m ? a : !a ? m : `${m} and ${a}`;
 
                     eventResults.push({
                         className: d.className,
-                        department: d.department, // Safely taken from Attendance Doc
-                        eventName: displayEventName
+                        department: d.department,
+                        eventName: name
                     });
                 }
             });
         } else {
-            // Case B: Range/Overall -> Return Counts (FIXED)
             const eventMap = {};
 
             attendanceData.forEach(d => {
                 if (d.isEvent) {
-                    const key = d.className;
-
-                    if (!eventMap[key]) {
-                        
-                        const clsInfo = classMap[d.classId?.toString()];
-                        eventMap[key] = {
-                            department: d.department || clsInfo?.department || "General",
+                    if (!eventMap[d.className]) {
+                        eventMap[d.className] = {
+                            department:
+                                d.department ||
+                                classMap[d.classId?.toString()]?.department ||
+                                "General",
                             count: 0
                         };
                     }
-                    eventMap[key].count += 1;
+                    eventMap[d.className].count += 1;
                 }
             });
 
-            // Convert map to array
-            eventResults = Object.entries(eventMap).map(([className, data]) => ({
+            eventResults = Object.entries(eventMap).map(([className, d]) => ({
                 className,
-                department: data.department,
-                count: data.count
+                department: d.department,
+                count: d.count
             }));
         }
 
-        /* =====================================================
-           5. LEADERBOARD
-        ===================================================== */
+        /* ===============================
+           5. Leaderboard (UNCHANGED)
+        =============================== */
         const leaderboardMap = {};
 
         attendanceData.forEach(d => {
             const cls = classMap[d.classId?.toString()];
             if (!cls) return;
 
-            const totalStudents = cls.totalStudents || 1;
-            const avgPresent = (d.MornCount + d.AftCount) / 2;
-            const percent = (avgPresent / totalStudents) * 100;
+            const avg = (d.MornCount + d.AftCount) / 2;
+            const percent = (avg / (cls.totalStudents || 1)) * 100;
 
             if (!leaderboardMap[d.className]) {
                 leaderboardMap[d.className] = {
@@ -200,7 +197,7 @@ export async function GET(req) {
             }
 
             leaderboardMap[d.className].totalPercent += percent;
-            leaderboardMap[d.className].totalPresent += avgPresent;
+            leaderboardMap[d.className].totalPresent += avg;
             leaderboardMap[d.className].count += 1;
         });
 
@@ -215,6 +212,7 @@ export async function GET(req) {
 
         return NextResponse.json({
             success: true,
+            academicYear,
             filter,
             data: {
                 departmentAttendance,
@@ -224,9 +222,8 @@ export async function GET(req) {
         });
 
     } catch (error) {
-        console.error("API Error:", error); // Log error for debugging
         return NextResponse.json(
-            { success: false, error: error.message || "Internal Server Error" },
+            { success: false, error: error.message },
             { status: 500 }
         );
     }
