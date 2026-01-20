@@ -41,6 +41,7 @@ const InputGroup = ({ label, icon: Icon, children, error, className = "" }) => (
 const AttendanceComponent = () => {
 
     const { data: session } = useSession();
+    const [selectedClassDept, setSelectedClassDept] = useState("");
 
     // State
     const [department, setDepartment] = useState(null);
@@ -148,22 +149,27 @@ const AttendanceComponent = () => {
 
     const handleClassChange = (e) => {
         const cls = classes.find((c) => c._id === e.target.value);
+
         if (cls) {
             setForm((prev) => ({
                 ...prev,
                 classId: cls._id,
                 className: cls.name,
                 MornCount: "",
-                AftCount: ""
+                AftCount: "",
             }));
+
             setSelectedClassLimit(cls.totalStudents || 0);
+            setSelectedClassDept(cls.department); // ✅ ADD THIS
             setErrors({});
         } else {
             setForm(prev => ({ ...prev, classId: "", className: "" }));
             setSelectedClassLimit(0);
+            setSelectedClassDept(""); // ✅ RESET
             setErrors({});
         }
     };
+
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -176,7 +182,7 @@ const AttendanceComponent = () => {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...form,
-                    department,
+                    department: selectedClassDept,
                     date: new Date(),
                     MornCount: Number(form.MornCount || 0),
                     AftCount: Number(form.AftCount || 0),
