@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Attendance from "@/models/Attendance";
-
+import Class from "@/models/Class";
 function getAcademicYear(date = new Date()) {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -28,10 +28,7 @@ export async function POST(req) {
 
         if (!date || !classId || !className || !department) {
             return NextResponse.json(
-                {
-                    success: false,
-                    message: "date, classId, className and department are required"
-                },
+                { success: false, message: "date, classId, className and department are required" },
                 { status: 400 }
             );
         }
@@ -41,6 +38,18 @@ export async function POST(req) {
 
         const academicYear = getAcademicYear(normalizedDate);
         const isEvent = Boolean(MEventName || AEventName);
+
+        // ✅ Fetch class details
+        const cls = await Class.findById(classId);
+        if (!cls) {
+            return NextResponse.json(
+                { success: false, message: "Class not found" },
+                { status: 404 }
+            );
+        }
+
+        // ✅ Snapshot of totalStudents for this date
+        const totalStudentsSnapshot = cls.totalStudents;
 
         const attendance = await Attendance.findOneAndUpdate(
             {
@@ -58,7 +67,10 @@ export async function POST(req) {
                 AftCount,
                 MEventName,
                 AEventName,
-                isEvent
+                isEvent,
+
+                // 🟢 IMPORTANT: store snapshot
+                totalStudentsSnapshot
             },
             {
                 new: true,
@@ -77,10 +89,7 @@ export async function POST(req) {
 
         if (error.code === 11000) {
             return NextResponse.json(
-                {
-                    success: false,
-                    message: "Attendance already exists for this class and date"
-                },
+                { success: false, message: "Attendance already exists for this class and date" },
                 { status: 409 }
             );
         }

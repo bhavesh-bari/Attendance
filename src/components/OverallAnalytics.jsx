@@ -1,10 +1,11 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { Globe, LayoutGrid, Building2, Filter as FilterIcon, Calendar } from "lucide-react";
 import DepartmentComparison from "@/components/UI/analytics/DepartmentComparison";
 import DepartmentAttendanceChart from "./UI/analytics/DepartmentAttendanceChart";
 import DepartmentEvents from "./UI/analytics/DepartmentEvents";
 
-/* ================= FILTER COMPONENT ================= */
+/* ================= MODERNISED OVERALL FILTER ================= */
 const Filter = ({ filters, onFilterChange, excludedFilters = [] }) => {
     const handleSelectChange = (e) => {
         const { name, value } = e.target;
@@ -14,15 +15,19 @@ const Filter = ({ filters, onFilterChange, excludedFilters = [] }) => {
     const isExcluded = (name) => excludedFilters.includes(name);
 
     return (
-        <div className="w-full overflow-x-auto py-2 hide-scrollbar">
-            <div className="flex gap-4 min-w-max px-2">
-                {/* Shift Filter */}
+        <div className="flex flex-wrap items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl shadow-sm">
+            <div className="flex items-center gap-2 text-gray-500 px-2 border-r border-gray-200 mr-2">
+                <FilterIcon size={16} />
+                <span className="text-xs font-semibold uppercase tracking-wider">Filters</span>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
                 {!isExcluded("shift") && (
                     <select
                         name="shift"
                         value={filters.shift}
                         onChange={handleSelectChange}
-                        className="border bg-white border-gray-300 rounded-lg px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2 outline-none"
                     >
                         <option value="overall">Overall Shift</option>
                         <option value="morning">Morning</option>
@@ -30,13 +35,12 @@ const Filter = ({ filters, onFilterChange, excludedFilters = [] }) => {
                     </select>
                 )}
 
-                {/* Time Period Filter */}
                 {!isExcluded("timePeriod") && (
                     <select
                         name="timePeriod"
                         value={filters.timePeriod}
                         onChange={handleSelectChange}
-                        className="border bg-white border-gray-300 rounded-lg px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2 outline-none"
                     >
                         <option value="overall">All Time</option>
                         <option value="today">Today</option>
@@ -45,12 +49,11 @@ const Filter = ({ filters, onFilterChange, excludedFilters = [] }) => {
                     </select>
                 )}
 
-                {/* Custom Date Range */}
                 {filters.timePeriod === "custom" && (
-                    <div className="flex items-center gap-2">
-                        <input type="date" name="startDate" value={filters.startDate} onChange={handleSelectChange} className="border px-3 py-2 text-sm rounded-lg" />
-                        <span className="text-sm text-gray-500">to</span>
-                        <input type="date" name="endDate" value={filters.endDate} onChange={handleSelectChange} className="border px-3 py-2 text-sm rounded-lg" />
+                    <div className="flex items-center gap-2 animate-in slide-in-from-left-2 duration-300">
+                        <input type="date" name="startDate" value={filters.startDate} onChange={handleSelectChange} className="border border-gray-300 px-2 py-1.5 text-sm rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+                        <span className="text-gray-400">to</span>
+                        <input type="date" name="endDate" value={filters.endDate} onChange={handleSelectChange} className="border border-gray-300 px-2 py-1.5 text-sm rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
                     </div>
                 )}
             </div>
@@ -58,25 +61,43 @@ const Filter = ({ filters, onFilterChange, excludedFilters = [] }) => {
     );
 };
 
+/* ================= USER-CENTRIC SUMMARY ================= */
 const OverallAnalyticsSummary = ({ stats }) => (
-    <div className="p-6 md:p-8 bg-white rounded-xl shadow-lg">
-        <h3 className="text-lg md:text-xl font-semibold text-indigo-600 mb-4">Institution-Wide Summary 🌍</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 text-center mt-6">
-            <div className="p-4 border rounded-lg bg-indigo-50">
-                <p className="text-3xl md:text-4xl font-black text-indigo-700 break-words">{stats?.overallAvgAttendance || 0}%</p>
-                <p className="text-xs md:text-sm text-gray-600 mt-1">Overall Avg. Attendance</p>
-            </div>
-            <div className="p-4 border rounded-lg bg-indigo-50">
-                <p className="text-3xl md:text-4xl font-black text-indigo-700 break-words">{stats?.totalDivisions || 0}</p>
-                <p className="text-xs md:text-sm text-gray-600 mt-1">Total Divisions</p>
-            </div>
-            <div className="p-4 border rounded-lg bg-indigo-50">
-                <p className="text-3xl md:text-4xl font-black text-indigo-700 break-words">{stats?.activeDepartments || 0}</p>
-                <p className="text-xs md:text-sm text-gray-600 mt-1">Active Departments</p>
-            </div>
-        </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <StatCard
+            icon={<Globe className="text-indigo-600" />}
+            label="Inst. Avg. Attendance"
+            value={`${stats?.overallAvgAttendance || 0}%`}
+            bgColor="bg-indigo-50"
+        />
+        <StatCard
+            icon={<LayoutGrid className="text-emerald-600" />}
+            label="Total Divisions"
+            value={stats?.totalDivisions || 0}
+            bgColor="bg-emerald-50"
+        />
+        <StatCard
+            icon={<Building2 className="text-amber-600" />}
+            label="Active Departments"
+            value={stats?.activeDepartments || 0}
+            bgColor="bg-amber-50"
+        />
     </div>
 );
+
+function StatCard({ icon, label, value, bgColor }) {
+    return (
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
+            <div className={`p-4 rounded-xl ${bgColor}`}>
+                {icon}
+            </div>
+            <div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{label}</p>
+                <p className="text-3xl font-black text-gray-900 tracking-tight">{value}</p>
+            </div>
+        </div>
+    );
+}
 
 export default function OverallAnalytics() {
     const [loading, setLoading] = useState(true);
@@ -89,7 +110,6 @@ export default function OverallAnalytics() {
         endDate: "",
     });
 
-    // Fetch Data
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
@@ -109,7 +129,6 @@ export default function OverallAnalytics() {
                 setLoading(false);
             }
         };
-
         fetchData();
     }, [filters]);
 
@@ -117,7 +136,6 @@ export default function OverallAnalytics() {
         setFilters((prev) => ({ ...prev, [name]: value }));
     };
 
-    // Transform Class Data to Department Data for the Bar Chart
     const processDeptData = () => {
         const deptMap = {};
         data.analytics.classes.forEach(c => {
@@ -138,35 +156,48 @@ export default function OverallAnalytics() {
         }));
     };
 
-    if (loading && !data.summary.overallAvgAttendance) return <div className="p-10 text-center">Loading Analytics...</div>;
+    if (loading && !data.summary.overallAvgAttendance) {
+        return <div className="p-20 text-center font-medium text-gray-400 animate-pulse">Gathering Institution Insights...</div>;
+    }
 
     const availableDepts = data.filters?.availableDepartments?.map(d => ({ id: d, name: d })) || [];
 
     return (
-        <div className="space-y-10 gap-2">
-            <OverallAnalyticsSummary stats={data.summary} />
-
-            <div className="bg-white rounded-lg shadow-md p-2 -mt-4">
+        <div className="space-y-8">
+            {/* 1. Header Area */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                        Institutional Overview
+                    </h2>
+                    <p className="text-gray-500 text-sm">Cross-departmental performance metrics.</p>
+                </div>
                 <Filter filters={filters} onFilterChange={handleFilterChange} />
             </div>
 
-            {/* Pass processed data to charts */}
-            <DepartmentEvents events={data.analytics.events} />
+            {/* 2. Stat Cards */}
+            <OverallAnalyticsSummary stats={data.summary} />
 
+            {/* 3. Original Components - Style Maintained */}
+            <div className="space-y-8">
+                <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                    <DepartmentEvents events={data.analytics.events} />
+                </div>
 
-            <div>
-                {/* The Chart expects an array of {name, overall, morning, afternoon} */}
-                <DepartmentAttendanceChart rawData={processDeptData()} filterProp={filters.shift} />
+                <div className="bg-white rounded-lg shadow-md overflow-hidden p-1">
+                    <DepartmentAttendanceChart rawData={processDeptData()} filterProp={filters.shift} />
+                </div>
 
-                <h2 className="text-2xl font-bold text-gray-800 pt-4 border-t mt-8 mb-4">
-                    Department Quick Comparison
-                </h2>
-                {/* DepartmentComparison needs to manage its own fetching based on dropdowns
-                   We pass the list of departments so it can populate dropdowns.
-                */}
-                <DepartmentComparison
-                    availableDepartments={availableDepts}
-                />
+                <div className="pt-6">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="h-8 w-1 bg-indigo-600 rounded-full"></div>
+                        <h2 className="text-xl font-bold text-gray-800">Department Quick Comparison</h2>
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-md border border-gray-100">
+                        <DepartmentComparison availableDepartments={availableDepts} />
+                    </div>
+                </div>
             </div>
         </div>
     );

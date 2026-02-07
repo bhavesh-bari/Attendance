@@ -1,10 +1,10 @@
 import React from 'react'
 import Layout from '@/components/Layout'
-import Anlytics from '@/components/DashboardPage'
+import Dashboard from '@/components/DashboardPage'
 function page() {
     return (
         <Layout>
-            <Anlytics />
+            <Dashboard />
         </Layout>
     )
 }

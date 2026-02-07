@@ -81,22 +81,33 @@ export async function GET(req) {
        HELPERS
     ======================= */
     const calcAttendance = (records, type = "overall") => {
-      let total = 0, count = 0;
+      let total = 0;
+      let count = 0;
+
       records.forEach(a => {
         const cls = classMap[a.classId?.toString()];
         if (!cls) return;
 
-        const val =
+        const totalStudents = a.totalStudentsSnapshot || cls.totalStudents;
+        if (!totalStudents || totalStudents <= 0) return;
+
+        let value =
           type === "morning"
             ? a.MornCount
             : type === "afternoon"
               ? a.AftCount
               : (a.MornCount + a.AftCount) / 2;
 
-        total += (val / cls.totalStudents) * 100;
+        let percent = (value / totalStudents) * 100;
+
+        if (isNaN(percent) || percent < 0) percent = 0;
+        if (percent > 100) percent = 100;
+
+        total += percent;
         count++;
       });
-      return count ? (total / count).toFixed(1) : "0.0";
+
+      return count ? Number((total / count).toFixed(1)) : 0.0;
     };
 
     const byDate = (records, from, to) =>
@@ -339,7 +350,8 @@ export async function GET(req) {
           : {
             department,
             departmentAvgAttendance: avgAttendance.toFixed(1),
-            totalDivisions: filteredClasses.length
+            totalDivisions: filteredClasses.length,
+            totalStudents: getTotalStudents(filteredClasses)
           },
       analytics: {
         classes: classAnalytics,

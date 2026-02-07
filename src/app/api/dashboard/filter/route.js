@@ -16,7 +16,6 @@ export async function GET(req) {
         await connectDB();
 
         const academicYear = getAcademicYear();
-
         const { searchParams } = new URL(req.url);
         const filter = searchParams.get("filter");
 
@@ -24,9 +23,7 @@ export async function GET(req) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        /* ===============================
-           1. Robust Date Filters
-        =============================== */
+        /* ----- FILTERS ----- */
         switch (filter) {
             case "today":
                 startDate = new Date(today);
@@ -39,36 +36,27 @@ export async function GET(req) {
                 break;
 
             case "overall":
-                startDate = null;
-                endDate = null;
+                startDate = endDate = null;
                 break;
 
-            case "date": {
-                const paramDate = searchParams.get("date");
-                if (!paramDate) throw new Error("Date parameter missing");
-                startDate = new Date(paramDate);
+            case "date":
+                const d = searchParams.get("date");
+                if (!d) throw new Error("Date missing");
+                startDate = new Date(d);
                 startDate.setHours(0, 0, 0, 0);
                 endDate = new Date(startDate);
                 break;
-            }
 
-            case "range": {
-                const fromParam = searchParams.get("from");
-                const toParam = searchParams.get("to");
+            case "range":
+                const from = searchParams.get("from");
+                const to = searchParams.get("to");
+                if (!from || !to) throw new Error("Range missing");
 
-                if (!fromParam || !toParam)
-                    throw new Error("Start and End dates required for range");
-
-                startDate = new Date(fromParam);
-                endDate = new Date(toParam);
-
-                if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()))
-                    throw new Error("Invalid date format provided");
-
+                startDate = new Date(from);
+                endDate = new Date(to);
                 startDate.setHours(0, 0, 0, 0);
                 endDate.setHours(0, 0, 0, 0);
                 break;
-            }
 
             default:
                 return NextResponse.json(
@@ -82,22 +70,18 @@ export async function GET(req) {
                 ? { date: { $gte: startDate, $lte: endDate }, academicYear }
                 : { academicYear };
 
-        /* ===============================
-           2. Fetch Data (UNCHANGED LOGIC)
-        =============================== */
+        /* ----- FETCH ALL ATTENDANCE + CLASSES ----- */
         const [attendanceData, classes] = await Promise.all([
             Attendance.find(dateQuery),
             Class.find({ academicYear })
         ]);
 
         const classMap = {};
-        classes.forEach(c => {
-            classMap[c._id.toString()] = c;
-        });
+        classes.forEach(c => classMap[c._id.toString()] = c);
 
-        /* ===============================
-           3. Department Attendance
-        =============================== */
+        /* ===========================
+           1. DEPARTMENT ATTENDANCE
+        ============================ */
         const attendanceAgg = {};
 
         attendanceData.forEach(d => {
@@ -105,33 +89,31 @@ export async function GET(req) {
             if (!cls) return;
 
             const key = d.classId.toString();
+            const strength = d.totalStudentsSnapshot || cls.totalStudents;
 
             if (!attendanceAgg[key]) {
                 attendanceAgg[key] = {
-                    department: cls.department,
                     className: cls.name,
-                    totalMorning: 0,
-                    totalAfternoon: 0,
-                    days: 0,
-                    totalStudents: cls.totalStudents || 1
+                    department: cls.department,
+                    morningPercents: [],
+                    afternoonPercents: []
                 };
             }
 
-            attendanceAgg[key].totalMorning += d.MornCount;
-            attendanceAgg[key].totalAfternoon += d.AftCount;
-            attendanceAgg[key].days += 1;
+            attendanceAgg[key].morningPercents.push((d.MornCount / strength) * 100);
+            attendanceAgg[key].afternoonPercents.push((d.AftCount / strength) * 100);
         });
 
         const departmentAttendance = Object.values(attendanceAgg).map(d => ({
-            department: d.department,
             className: d.className,
-            morningPercent: ((d.totalMorning / d.days / d.totalStudents) * 100).toFixed(1),
-            afternoonPercent: ((d.totalAfternoon / d.days / d.totalStudents) * 100).toFixed(1)
+            department: d.department,
+            morningPercent: (d.morningPercents.reduce((a, b) => a + b, 0) / d.morningPercents.length).toFixed(1),
+            afternoonPercent: (d.afternoonPercents.reduce((a, b) => a + b, 0) / d.afternoonPercents.length).toFixed(1)
         }));
 
-        /* ===============================
-           4. Events (UNCHANGED)
-        =============================== */
+        /* ===========================
+           2. EVENT COUNTS
+        ============================ */
         let eventResults = [];
         const isSingleDay = filter === "today" || filter === "date";
 
@@ -140,7 +122,7 @@ export async function GET(req) {
                 if (d.isEvent) {
                     const m = d.MEventName || "";
                     const a = d.AEventName || "";
-                    const name = m === a ? m : !m ? a : !a ? m : `${m} and ${a}`;
+                    const name = m === a ? m : !m ? a : !a ? m : `${m} + ${a}`;
 
                     eventResults.push({
                         className: d.className,
@@ -151,7 +133,6 @@ export async function GET(req) {
             });
         } else {
             const eventMap = {};
-
             attendanceData.forEach(d => {
                 if (d.isEvent) {
                     if (!eventMap[d.className]) {
@@ -163,7 +144,7 @@ export async function GET(req) {
                             count: 0
                         };
                     }
-                    eventMap[d.className].count += 1;
+                    eventMap[d.className].count++;
                 }
             });
 
@@ -174,42 +155,49 @@ export async function GET(req) {
             }));
         }
 
-        /* ===============================
-           5. Leaderboard (UNCHANGED)
-        =============================== */
+        /* ===========================
+           3. LEADERBOARD
+        ============================ */
         const leaderboardMap = {};
 
         attendanceData.forEach(d => {
             const cls = classMap[d.classId?.toString()];
             if (!cls) return;
 
-            const avg = (d.MornCount + d.AftCount) / 2;
-            const percent = (avg / (cls.totalStudents || 1)) * 100;
+            const strength = d.totalStudentsSnapshot || cls.totalStudents;
+            const avgPresent = (d.MornCount + d.AftCount) / 2;
+            const percent = (avgPresent / strength) * 100;
 
             if (!leaderboardMap[d.className]) {
                 leaderboardMap[d.className] = {
                     className: d.className,
                     department: cls.department,
-                    totalPercent: 0,
-                    totalPresent: 0,
-                    count: 0
+                    percents: [],
+                    presentCounts: []
                 };
             }
 
-            leaderboardMap[d.className].totalPercent += percent;
-            leaderboardMap[d.className].totalPresent += avg;
-            leaderboardMap[d.className].count += 1;
+            leaderboardMap[d.className].percents.push(percent);
+            leaderboardMap[d.className].presentCounts.push(avgPresent);
         });
 
         const leaderboard = Object.values(leaderboardMap)
             .map(d => ({
                 className: d.className,
                 department: d.department,
-                percentage: (d.totalPercent / d.count).toFixed(1),
-                studentCounts: Math.round(d.totalPresent / d.count)
+                percentage: (
+                    d.percents.reduce((a, b) => a + b, 0) / d.percents.length
+                ).toFixed(1),
+                studentCounts: Math.round(
+                    d.presentCounts.reduce((a, b) => a + b, 0) /
+                    d.presentCounts.length
+                )
             }))
             .sort((a, b) => b.percentage - a.percentage);
 
+        /* ===========================
+           FINAL RESPONSE
+        ============================ */
         return NextResponse.json({
             success: true,
             academicYear,

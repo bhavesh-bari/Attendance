@@ -31,7 +31,11 @@ const AttendanceSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-
+    totalStudentsSnapshot: {
+      type: Number,
+      required: true
+    }
+    ,
     MornCount: { type: Number, default: 0 },
     AftCount: { type: Number, default: 0 },
 

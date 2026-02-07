@@ -25,52 +25,94 @@ export async function GET() {
 
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
+        /* ===============================
+           GET CLASSES MAP
+        =============================== */
         const classes = await Class.find({ academicYear });
         const classMap = {};
         classes.forEach(c => (classMap[c._id.toString()] = c));
 
-        const calcPercent = (d, total) =>
-            total ? ((d.MornCount + d.AftCount) / 2 / total) * 100 : 0;
+        /* ===============================
+           % CALC PER DAY
+        =============================== */
+        const calcPercent = (d, cls) => {
+            const total = d.totalStudentsSnapshot || cls?.totalStudents;
+            if (!total || total <= 0) return 0;
+            const avg = (d.MornCount + d.AftCount) / 2;
+            return (avg / total) * 100;
+        };
 
+        /* ===============================
+           TODAY DATA
+        =============================== */
         const todayData = await Attendance.find({ date: today, academicYear });
-        const yesterdayData = await Attendance.find({ date: yesterday, academicYear });
+
+        const todayPercents = todayData.map(d =>
+            calcPercent(d, classMap[d.classId])
+        );
 
         const todayAvg =
-            todayData.reduce((s, d) => s + calcPercent(d, classMap[d.classId]?.totalStudents), 0) /
-            (todayData.length || 1);
+            todayPercents.reduce((a, b) => a + b, 0) /
+            (todayPercents.length || 1);
+
+        /* ===============================
+           YESTERDAY DATA
+        =============================== */
+        const yesterdayData = await Attendance.find({
+            date: yesterday,
+            academicYear
+        });
+
+        const yesterdayPercents = yesterdayData.map(d =>
+            calcPercent(d, classMap[d.classId])
+        );
 
         const yesterdayAvg =
-            yesterdayData.reduce((s, d) => s + calcPercent(d, classMap[d.classId]?.totalStudents), 0) /
-            (yesterdayData.length || 1);
+            yesterdayPercents.reduce((a, b) => a + b, 0) /
+            (yesterdayPercents.length || 1);
 
+        /* ===============================
+           BEST + WORST CLASS TODAY
+        =============================== */
         let bestClass = null;
         let worstClass = null;
 
         todayData.forEach(d => {
-            const percent = calcPercent(d, classMap[d.classId]?.totalStudents);
+            const percent = calcPercent(d, classMap[d.classId]);
+            const obj = { ...d.toObject(), percent };
 
-            if (!bestClass || percent > bestClass.percent)
-                bestClass = { ...d.toObject(), percent };
-
-            if (!worstClass || percent < worstClass.percent)
-                worstClass = { ...d.toObject(), percent };
+            if (!bestClass || percent > bestClass.percent) bestClass = obj;
+            if (!worstClass || percent < worstClass.percent) worstClass = obj;
         });
 
+        /* ===============================
+           MONTH DATA
+        =============================== */
         const monthData = await Attendance.find({
             academicYear,
             date: { $gte: monthStart, $lte: today }
         });
 
-        const monthlyAvg =
-            monthData.reduce((s, d) => s + calcPercent(d, classMap[d.classId]?.totalStudents), 0) /
-            (monthData.length || 1);
+        const monthPercents = monthData.map(d =>
+            calcPercent(d, classMap[d.classId])
+        );
 
+        const monthlyAvg =
+            monthPercents.reduce((a, b) => a + b, 0) /
+            (monthPercents.length || 1);
+
+        /* ===============================
+           UPCOMING EVENT
+        =============================== */
         const upcomingEvent = await Attendance.findOne({
             academicYear,
             date: { $gt: today },
             isEvent: true
         }).sort({ date: 1 });
 
+        /* ===============================
+           EVENT COUNTS BY DEPT
+        =============================== */
         const eventCounts = {};
         monthData.forEach(d => {
             if (d.isEvent) {
@@ -79,8 +121,13 @@ export async function GET() {
             }
         });
 
-        const mostEventsDept = Object.entries(eventCounts).sort((a, b) => b[1] - a[1])[0];
+        const mostEventsDept = Object.entries(eventCounts).sort(
+            (a, b) => b[1] - a[1]
+        )[0];
 
+        /* ===============================
+           FINAL RESPONSE
+        =============================== */
         return NextResponse.json({
             success: true,
             academicYear,
@@ -89,23 +136,30 @@ export async function GET() {
                     percentage: todayAvg.toFixed(1),
                     change: (todayAvg - yesterdayAvg).toFixed(1)
                 },
-                bestPerforming: bestClass && {
-                    className: bestClass.className,
-                    percentage: bestClass.percent.toFixed(1)
-                },
-                lowestAttendance: worstClass && {
-                    className: worstClass.className,
-                    percentage: worstClass.percent.toFixed(1)
-                },
+                bestPerforming:
+                    bestClass && {
+                        className: bestClass.className,
+                        percentage: bestClass.percent.toFixed(1)
+                    },
+                lowestAttendance:
+                    worstClass && {
+                        className: worstClass.className,
+                        percentage: worstClass.percent.toFixed(1)
+                    },
                 monthlyAverage: monthlyAvg.toFixed(1),
-                upcomingEvent: upcomingEvent && {
-                    name: upcomingEvent.MEventName || upcomingEvent.AEventName,
-                    date: upcomingEvent.date
-                },
-                mostEvents: mostEventsDept && {
-                    department: mostEventsDept[0],
-                    count: mostEventsDept[1]
-                }
+                upcomingEvent:
+                    upcomingEvent && {
+                        name:
+                            upcomingEvent.MEventName ||
+                            upcomingEvent.AEventName ||
+                            "Event",
+                        date: upcomingEvent.date
+                    },
+                mostEvents:
+                    mostEventsDept && {
+                        department: mostEventsDept[0],
+                        count: mostEventsDept[1]
+                    }
             }
         });
 

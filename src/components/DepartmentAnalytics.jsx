@@ -1,19 +1,24 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { Users, BookOpen, BarChart3, Filter as FilterIcon } from "lucide-react";
 import ClassesComparison from "@/components/UI/analytics/ClassesComparision";
 import DepartmentClassAttendanceChart from "@/components/UI/analytics/ClassAttendanceChart";
 import ClassesEvents from "@/components/UI/analytics/ClassesEvents";
 
-/* ================= FILTER COMPONENT ================= */
-const Filter = ({ filters, onFilterChange, departments = [] }) => {
+/* ================= MODERNISED FILTER BAR ================= */
+const FilterBar = ({ filters, onFilterChange, departments = [] }) => {
     return (
-        <div className="w-full overflow-x-auto py-2 hide-scrollbar">
-            <div className="flex gap-4 min-w-max px-2">
+        <div className="flex flex-wrap items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl shadow-sm">
+            <div className="flex items-center gap-2 text-gray-500 px-2 border-r border-gray-200 mr-2">
+                <FilterIcon size={16} />
+                <span className="text-xs font-semibold uppercase tracking-wider">Filters</span>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
                 <select
-                    name="department"
                     value={filters.department}
                     onChange={(e) => onFilterChange("department", e.target.value)}
-                    className="border bg-white border-gray-300 rounded-lg px-4 py-2 text-sm shadow-sm focus:outline-none"
+                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2 outline-none"
                 >
                     {departments.map((d) => (
                         <option key={d} value={d}>{d}</option>
@@ -21,10 +26,9 @@ const Filter = ({ filters, onFilterChange, departments = [] }) => {
                 </select>
 
                 <select
-                    name="shift"
                     value={filters.shift}
                     onChange={(e) => onFilterChange("shift", e.target.value)}
-                    className="border bg-white border-gray-300 rounded-lg px-4 py-2 text-sm shadow-sm focus:outline-none"
+                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2 outline-none"
                 >
                     <option value="overall">Overall Shift</option>
                     <option value="morning">Morning</option>
@@ -32,10 +36,9 @@ const Filter = ({ filters, onFilterChange, departments = [] }) => {
                 </select>
 
                 <select
-                    name="timePeriod"
                     value={filters.timePeriod}
                     onChange={(e) => onFilterChange("timePeriod", e.target.value)}
-                    className="border bg-white border-gray-300 rounded-lg px-4 py-2 text-sm shadow-sm focus:outline-none"
+                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2 outline-none"
                 >
                     <option value="overall">All Time</option>
                     <option value="today">Today</option>
@@ -48,16 +51,19 @@ const Filter = ({ filters, onFilterChange, departments = [] }) => {
 
 export default function DepartmentAnalytics() {
     const [loading, setLoading] = useState(true);
-    const [data, setData] = useState({ summary: {}, analytics: { classes: [], events: [] }, filters: { availableDepartments: [], availableClasses: [] } });
+    const [data, setData] = useState({
+        summary: {},
+        analytics: { classes: [], events: [] },
+        filters: { availableDepartments: [], availableClasses: [] }
+    });
 
-    // Default filters
     const [filters, setFilters] = useState({
-        department: "", // Will set after first fetch
+        department: "",
         shift: "overall",
         timePeriod: "overall",
     });
 
-    // 1. Initial Fetch to get Departments list
+    // Fetch Logic (Kept exactly as per your functional requirements)
     useEffect(() => {
         fetch('/api/analytics?scope=institution').then(res => res.json()).then(res => {
             if (res.success && res.filters.availableDepartments.length > 0) {
@@ -66,71 +72,72 @@ export default function DepartmentAnalytics() {
         });
     }, []);
 
-    // 2. Fetch Department Data
     useEffect(() => {
         if (!filters.department) return;
-
         const fetchData = async () => {
             setLoading(true);
             try {
                 const query = new URLSearchParams({
-                    scope: "department",
-                    department: filters.department,
-                    period: filters.timePeriod,
+                    scope: "department", department: filters.department, period: filters.timePeriod,
                 });
                 const res = await fetch(`/api/analytics?${query.toString()}`);
                 const result = await res.json();
                 if (result.success) setData(result);
-            } catch (error) {
-                console.error("Failed to fetch department analytics", error);
             } finally {
                 setLoading(false);
             }
         };
-
         fetchData();
     }, [filters.department, filters.timePeriod]);
-
 
     const handleFilterChange = (name, value) => {
         setFilters((prev) => ({ ...prev, [name]: value }));
     };
 
-    if (loading && !data.summary.departmentAvgAttendance) return <div className="p-10 text-center">Loading Department Data...</div>;
-
-    const summary = data.summary;
+    if (loading && !data.summary.departmentAvgAttendance) {
+        return <div className="p-10 text-center animate-pulse text-gray-500">Loading Department Data...</div>;
+    }
 
     return (
-        <div className="p-2 bg-gray-100 rounded-xl shadow-lg space-y-4 w-full">
+        <div className="space-y-6">
 
-            {/* Summary Cards */}
-            <div className="p-6 md:p-8 bg-white rounded-xl shadow-lg">
-                <h3 className="text-lg md:text-xl font-semibold text-indigo-600 mb-4">
-                    {filters.department} Summary
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 text-center mt-6">
-                    <div className="p-4 border rounded-lg bg-indigo-50">
-                        <p className="text-3xl md:text-4xl font-black text-indigo-700">{summary.departmentAvgAttendance || 0}%</p>
-                        <p className="text-xs md:text-sm text-gray-600 mt-1">Avg. Attendance</p>
-                    </div>
-                    <div className="p-4 border rounded-lg bg-indigo-50">
-                        <p className="text-3xl md:text-4xl font-black text-indigo-700">{summary.totalDivisions || 0}</p>
-                        <p className="text-xs md:text-sm text-gray-600 mt-1">Total Classes</p>
-                    </div>
+            {/* 1. Header & Filters Section */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800">{filters.department} Dashboard</h2>
+                    <p className="text-gray-500 text-sm">Detailed breakdown of attendance and academic events.</p>
                 </div>
-            </div>
-
-            {/* Filter */}
-            <div className="bg-white rounded-lg shadow-md p-2">
-                <Filter
+                <FilterBar
                     filters={filters}
                     onFilterChange={handleFilterChange}
                     departments={data.filters?.availableDepartments || []}
                 />
             </div>
 
-            {/* Attendance Bar Chart */}
-            <div className="bg-white rounded-lg shadow-md">
+            {/* 2. New User-Centric Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <StatCard
+                    icon={<BarChart3 className="text-indigo-600" />}
+                    label="Avg. Attendance"
+                    value={`${data.summary.departmentAvgAttendance || 0}%`}
+                    bgColor="bg-indigo-50"
+                />
+                <StatCard
+                    icon={<BookOpen className="text-emerald-600" />}
+                    label="Total Classes"
+                    value={data.summary.totalDivisions || 0}
+                    bgColor="bg-emerald-50"
+                />
+                <StatCard
+                    icon={<Users className="text-amber-600" />}
+                    label="Total Students"
+                    value={data.summary.totalStudents || 0}
+                    bgColor="bg-amber-50"
+                />
+            </div>
+
+            {/* 3. Original Components - Kept as per your previous UI style */}
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
                 <DepartmentClassAttendanceChart
                     data={data.analytics.classes}
                     selectedDept={filters.department}
@@ -138,25 +145,38 @@ export default function DepartmentAnalytics() {
                 />
             </div>
 
-            {/* Events Pie Chart */}
-            <div className="bg-white rounded-lg shadow-md">
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
                 <ClassesEvents
                     department={filters.department}
                     events={data.analytics.events}
                 />
             </div>
 
-            {/* Classes Comparison */}
             <div className="border rounded-lg bg-indigo-50 p-4">
                 <h3 className="text-xl font-medium text-indigo-700 mb-3">
                     Classes Comparison
                 </h3>
                 <div className="bg-white rounded-lg shadow-md">
-                    {/* Pass available classes for this dept so dropdowns can populate */}
                     <ClassesComparison
                         availableClasses={data.filters?.availableClasses?.map(c => ({ id: c._id, name: c.name })) || []}
                     />
                 </div>
+            </div>
+
+        </div>
+    );
+}
+
+/* Reusable Stat Card Component */
+function StatCard({ icon, label, value, bgColor }) {
+    return (
+        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+            <div className={`p-3 rounded-lg ${bgColor}`}>
+                {icon}
+            </div>
+            <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
+                <p className="text-2xl font-black text-gray-900">{value}</p>
             </div>
         </div>
     );

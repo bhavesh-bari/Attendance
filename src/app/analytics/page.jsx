@@ -7,50 +7,62 @@ import OverallAnalytics from "@/components/OverallAnalytics";
 export default function AttendancePage() {
     const [activeTab, setActiveTab] = useState("overall");
 
-    const TabButton = ({ tabName, label, isActive }) => {
-        const baseClasses =
-            "px-6 py-3 text-lg font-medium rounded-t-lg transition-all duration-300 ease-in-out cursor-pointer focus:outline-none";
-        const activeClasses =
-            "text-indigo-600 border-b-4 border-indigo-600 bg-white shadow-md";
-        const inactiveClasses =
-            "text-gray-500 border-b-4 border-transparent hover:bg-gray-100 hover:text-gray-700";
-
-        return (
-            <button
-                className={`${baseClasses} ${isActive ? activeClasses : inactiveClasses
-                    }`}
-                onClick={() => setActiveTab(tabName)}
-            >
-                {label}
-            </button>
-        );
-    };
-
     return (
         <Layout>
-            <div className="max-w-fit md:ml-16  bg-gray-50 min-h-screen justify-center">
-                <h1 className="text-4xl font-extrabold text-gray-900 mb-8 border-b pb-4">
-                    Attendance Dashboard
-                </h1>
+            <div className="min-h-screen bg-slate-50/50 p-4 md:p-8 lg:p-12">
+                {/* Header Section */}
+                <header className="max-w-7xl mx-auto mb-10">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div>
+                            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+                                Attendance Analytics
+                            </h1>
+                            <p className="text-slate-500 mt-1">
+                                Monitor and analyze attendance at Institute level and Departmental level.
+                            </p>
+                        </div>
 
-                <div className="flex justify-start border-b border-gray-200 mb-8 space-x-2">
-                    <TabButton
-                        tabName="department"
-                        label="Department Wise Analytics"
-                        isActive={activeTab === "department"}
-                    />
-                    <TabButton
-                        tabName="overall"
-                        label="Overall Attendance Analytics"
-                        isActive={activeTab === "overall"}
-                    />
-                </div>
+                        {/* Realistic Segmented Control (Tabs) */}
+                        <div className="inline-flex p-1 bg-slate-200/50 rounded-xl backdrop-blur-sm">
+                            <button
+                                onClick={() => setActiveTab("overall")}
+                                className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === "overall"
+                                    ? "bg-white text-indigo-600 shadow-sm"
+                                    : "text-slate-600 hover:text-slate-900"
+                                    }`}
+                            >
+                                Overall View
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("department")}
+                                className={`px-5 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === "department"
+                                    ? "bg-white text-indigo-600 shadow-sm"
+                                    : "text-slate-600 hover:text-slate-900"
+                                    }`}
+                            >
+                                Departmental
+                            </button>
+                        </div>
+                    </div>
+                </header>
 
-                {/* --- Tab Content --- */}
-                <div className="mt-6">
-                    {activeTab === "department" && <DepartmentAnalytics />}
-                    {activeTab === "overall" && <OverallAnalytics />}
-                </div>
+                {/* Main Content Area */}
+                <main className="max-w-7xl mx-auto">
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden min-h-[60vh]">
+                        <div className="p-6 md:p-8">
+                            {/* Animation wrapper could be added here */}
+                            {activeTab === "overall" ? (
+                                <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                    <OverallAnalytics />
+                                </div>
+                            ) : (
+                                <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                    <DepartmentAnalytics />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </main>
             </div>
         </Layout>
     );

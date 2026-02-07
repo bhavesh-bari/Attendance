@@ -16,7 +16,6 @@ function getAcademicYear(date = new Date()) {
 
 export async function GET(req) {
     await connectDB();
-
     const { searchParams } = new URL(req.url);
 
     const departmentFilter = searchParams.get("department") || "ALL";
@@ -27,12 +26,10 @@ export async function GET(req) {
     const fromParam = searchParams.get("from");
     const toParam = searchParams.get("to");
 
+    const academicYear = getAcademicYear();
     const alldepartments = await Class.distinct("department");
 
-    /* ================= ACADEMIC YEAR ================= */
-    const academicYear = getAcademicYear();
-
-    /* ================= DATE FILTER ================= */
+    /* =============== DATE FILTER ================= */
     let startDate = null;
     let endDate = null;
 
@@ -41,13 +38,13 @@ export async function GET(req) {
 
     switch (period) {
         case "today":
-            startDate = new Date(today);
-            endDate = new Date(today);
+            startDate = today;
+            endDate = today;
             break;
 
         case "month":
             startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-            endDate = new Date(today);
+            endDate = today;
             break;
 
         case "date":
@@ -63,10 +60,6 @@ export async function GET(req) {
                 endDate = new Date(toParam);
             }
             break;
-
-        case "overall":
-        default:
-            break;
     }
 
     if (startDate) startDate.setHours(0, 0, 0, 0);
@@ -77,155 +70,147 @@ export async function GET(req) {
             ? { date: { $gte: startDate, $lte: endDate }, academicYear }
             : { academicYear };
 
-    /* ================= CLASS QUERY ================= */
+    /* =============== LOAD DATA ================= */
     const classQuery = { academicYear };
 
-    if (departmentFilter !== "ALL") {
-        classQuery.department = departmentFilter;
-    }
-
-    if (yearFilter !== "ALL" && REVERSE_YEAR_MAP[yearFilter]) {
-        classQuery.year = REVERSE_YEAR_MAP[yearFilter];
-    }
+    if (departmentFilter !== "ALL") classQuery.department = departmentFilter;
+    if (yearFilter !== "ALL") classQuery.year = REVERSE_YEAR_MAP[yearFilter];
 
     const classes = await Class.find(classQuery).lean();
     const attendance = await Attendance.find(dateQuery).lean();
 
-    /* ================= COLUMNS ================= */
-    const columnSet = new Set();
-    classes.forEach(c => {
-        const y = YEAR_MAP[c.year];
-        if (y) columnSet.add(`${y}-${c.division}`);
-    });
-
-    const columns = Array.from(columnSet).sort((a, b) => {
+    /* =============== COLUMNS ================= */
+    const columns = [...new Set(
+        classes.map(c => `${YEAR_MAP[c.year]}-${c.division}`)
+    )].sort((a, b) => {
         const order = ["FE", "SE", "TE", "BE"];
         const [ya, da] = a.split("-");
         const [yb, db] = b.split("-");
         return order.indexOf(ya) - order.indexOf(yb) || da.localeCompare(db);
     });
 
-    /* ================= HELPERS ================= */
-    const isMultiDay = ["month", "overall", "range"].includes(period);
-    const includeEvents = period === "today" || period === "date";
+    /* =============== HELPER FUNCTIONS ================= */
 
-    const getShiftEvent = (records, session) => {
-        if (!includeEvents) return "";
-        let eventName = "";
-        records.forEach(r => {
-            if (!r.isEvent) return;
-            if (session === "morning" && r.MEventName) eventName = r.MEventName;
-            if (session === "afternoon" && r.AEventName) eventName = r.AEventName;
-        });
-        return eventName;
-    };
-
-    const calcCell = (records, session, totalStudents) => {
+    // Average daily logic
+    const calcCell = (records, session, includeEvents) => {
         if (!records.length) {
-            return includeEvents
-                ? { P: 0, "%": 0, eventName: "" }
-                : { P: 0, "%": 0 };
+            return includeEvents ? { P: "-", "%": "-", eventName: "" } : { P: "-", "%": "-" };
         }
 
-        let present = 0;
-        const uniqueDays = new Set();
+        // Group records by day
+        const dayMap = {};
 
-        records.forEach(r => {
-            uniqueDays.add(new Date(r.date).toDateString());
-            present += session === "morning"
-                ? r.MornCount || 0
-                : r.AftCount || 0;
-        });
+        for (const r of records) {
+            const day = new Date(r.date).toDateString();
 
-        const days = isMultiDay ? uniqueDays.size || 1 : 1;
-        const avgPresent = present / days;
+            if (!dayMap[day]) dayMap[day] = { present: 0, snapshot: 0, event: "" };
 
-        const capacityPerDay = (totalStudents * records.length) / days;
-        const percent = capacityPerDay
-            ? Number(((avgPresent / capacityPerDay) * 100).toFixed(2))
+            const snap = r.totalStudentsSnapshot || 0;
+
+            if (session === "morning") {
+                dayMap[day].present += r.MornCount || 0;
+            } else {
+                dayMap[day].present += r.AftCount || 0;
+            }
+
+            dayMap[day].snapshot += snap;
+
+            if (includeEvents) {
+                if (session === "morning" && r.MEventName) dayMap[day].event = r.MEventName;
+                if (session === "afternoon" && r.AEventName) dayMap[day].event = r.AEventName;
+            }
+        }
+
+        const dailyPercents = [];
+        const dailyPresents = [];
+        let eventName = "";
+
+        for (const d of Object.values(dayMap)) {
+            if (d.snapshot > 0) {
+                dailyPercents.push((d.present / d.snapshot) * 100);
+                dailyPresents.push(d.present);
+            }
+            if (d.event) eventName = d.event;
+        }
+
+        const avgPercent = dailyPercents.length
+            ? Number((dailyPercents.reduce((a, b) => a + b) / dailyPercents.length).toFixed(2))
             : 0;
 
-        const cell = {
-            P: Number(avgPresent.toFixed(2)),
-            "%": percent
-        };
+        const avgPresent = dailyPresents.length
+            ? Number((dailyPresents.reduce((a, b) => a + b) / dailyPresents.length).toFixed(2))
+            : 0;
 
-        if (includeEvents) {
-            cell.eventName = getShiftEvent(records, session);
-        }
+        const cell = { P: avgPresent, "%": avgPercent };
+
+        if (includeEvents) cell.eventName = eventName;
 
         return cell;
     };
 
-    /* ================= ROWS ================= */
+    const isMultiDay = ["month", "overall", "range"].includes(period);
+    const includeEvents = ["today", "date"].includes(period);
+
+    /* =============== ROWS ================= */
     const departments = [...new Set(classes.map(c => c.department))];
     const sessions = ["morning", "afternoon"];
+
     const rows = [];
 
-    departments.forEach(dept => {
-        sessions.forEach(session => {
+    for (const dept of departments) {
+        for (const session of sessions) {
             const row = {
                 rowKey: `${dept}_${session}`,
-                label: `${dept} ${session.charAt(0).toUpperCase() + session.slice(1)}`,
+                label: `${dept} ${session === "morning" ? "Morning" : "Afternoon"}`,
                 data: {}
             };
 
-            let totalP = 0;
-            let totalCapacity = 0;
+            let totalPercentList = [];
+            let totalPList = [];
 
-            columns.forEach(col => {
+            for (const col of columns) {
                 const [yearLabel, division] = col.split("-");
                 const year = Number(
                     Object.keys(YEAR_MAP).find(k => YEAR_MAP[k] === yearLabel)
                 );
 
-                const matchedClasses = classes.filter(
-                    c =>
-                        c.department === dept &&
-                        c.year === year &&
-                        c.division === division
+                const match = classes.filter(
+                    c => c.department === dept && c.year === year && c.division === division
                 );
 
-                if (!matchedClasses.length) {
+                if (!match.length) {
                     row.data[col] = includeEvents
                         ? { P: "-", "%": "-", eventName: "" }
                         : { P: "-", "%": "-" };
-                    return;
+                    continue;
                 }
 
-                let records = [];
-                matchedClasses.forEach(cls => {
-                    records.push(
-                        ...attendance.filter(
-                            a => String(a.classId) === String(cls._id)
-                        )
-                    );
-                });
-
-                const cell = calcCell(
-                    records,
-                    session,
-                    matchedClasses[0].totalStudents
+                const allRecords = attendance.filter(
+                    a => String(a.classId) === String(match[0]._id)
                 );
+
+                const cell = calcCell(allRecords, session, includeEvents);
 
                 row.data[col] = cell;
 
                 if (cell.P !== "-") {
-                    totalP += cell.P;
-                    totalCapacity += matchedClasses[0].totalStudents;
+                    totalPercentList.push(cell["%"]);
+                    totalPList.push(cell["P"]);
                 }
-            });
+            }
 
             row.data["TOTAL"] = {
-                P: Number(totalP.toFixed(2)),
-                "%": totalCapacity
-                    ? Number(((totalP / totalCapacity) * 100).toFixed(2))
+                P: totalPList.length
+                    ? Number((totalPList.reduce((a, b) => a + b) / totalPList.length).toFixed(2))
+                    : 0,
+                "%": totalPercentList.length
+                    ? Number((totalPercentList.reduce((a, b) => a + b) / totalPercentList.length).toFixed(2))
                     : 0
             };
 
             rows.push(row);
-        });
-    });
+        }
+    }
 
     return NextResponse.json({
         success: true,
