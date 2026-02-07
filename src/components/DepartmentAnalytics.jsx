@@ -5,6 +5,58 @@ import ClassesComparison from "@/components/UI/analytics/ClassesComparision";
 import DepartmentClassAttendanceChart from "@/components/UI/analytics/ClassAttendanceChart";
 import ClassesEvents from "@/components/UI/analytics/ClassesEvents";
 
+/* ================= SKELETON COMPONENTS ================= */
+
+const Skeleton = ({ className }) => (
+    <div className={`bg-gray-200 animate-pulse rounded-md ${className}`} />
+);
+
+const DepartmentSkeleton = () => (
+    <div className="space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="space-y-2">
+                <Skeleton className="h-8 w-64" />
+                <Skeleton className="h-4 w-80" />
+            </div>
+            <Skeleton className="h-12 w-full md:w-80 rounded-xl" />
+        </div>
+
+        {/* Stats Grid Skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+                    <Skeleton className="h-12 w-12 rounded-lg" />
+                    <div className="space-y-2">
+                        <Skeleton className="h-3 w-20" />
+                        <Skeleton className="h-6 w-12" />
+                    </div>
+                </div>
+            ))}
+        </div>
+
+        {/* Chart Skeleton */}
+        <div className="bg-white rounded-lg shadow-md h-80 p-6 flex flex-col justify-end gap-2">
+            <Skeleton className="h-6 w-48 mb-auto" />
+            <div className="flex items-end gap-4 h-full">
+                {[...Array(8)].map((_, i) => (
+                    <Skeleton key={i} className="flex-1" style={{ height: `${Math.random() * 60 + 20}%` }} />
+                ))}
+            </div>
+        </div>
+
+        {/* Events Skeleton */}
+        <div className="bg-white rounded-lg shadow-md h-64 p-6 flex items-center justify-center">
+            <Skeleton className="h-40 w-40 rounded-full" />
+            <div className="ml-6 space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-20" />
+            </div>
+        </div>
+    </div>
+);
+
 /* ================= MODERNISED FILTER BAR ================= */
 const FilterBar = ({ filters, onFilterChange, departments = [] }) => {
     return (
@@ -63,7 +115,7 @@ export default function DepartmentAnalytics() {
         timePeriod: "overall",
     });
 
-    // Fetch Logic (Kept exactly as per your functional requirements)
+    // Fetch Logic
     useEffect(() => {
         fetch('/api/analytics?scope=institution').then(res => res.json()).then(res => {
             if (res.success && res.filters.availableDepartments.length > 0) {
@@ -94,12 +146,13 @@ export default function DepartmentAnalytics() {
         setFilters((prev) => ({ ...prev, [name]: value }));
     };
 
+    // User-Centric Loading Integration
     if (loading && !data.summary.departmentAvgAttendance) {
-        return <div className="p-10 text-center animate-pulse text-gray-500">Loading Department Data...</div>;
+        return <DepartmentSkeleton />;
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-in fade-in duration-500">
 
             {/* 1. Header & Filters Section */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -136,7 +189,7 @@ export default function DepartmentAnalytics() {
                 />
             </div>
 
-            {/* 3. Original Components - Kept as per your previous UI style */}
+            {/* 3. Original Components */}
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
                 <DepartmentClassAttendanceChart
                     data={data.analytics.classes}
@@ -167,7 +220,6 @@ export default function DepartmentAnalytics() {
     );
 }
 
-/* Reusable Stat Card Component */
 function StatCard({ icon, label, value, bgColor }) {
     return (
         <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">

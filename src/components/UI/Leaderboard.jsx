@@ -74,9 +74,9 @@ const FullLeaderboardTable = ({ data }) => {
 
     const getStatusBadge = (percentage) => {
         const val = parseFloat(percentage);
-        if (val >= 90) return <span className="px-2 py-1 text-xs font-bold text-green-700 bg-green-100 rounded-md border border-green-200">Excellent</span>;
-        if (val >= 75) return <span className="px-2 py-1 text-xs font-bold text-blue-700 bg-blue-100 rounded-md border border-blue-200">Good</span>;
-        if (val >= 60) return <span className="px-2 py-1 text-xs font-bold text-orange-700 bg-orange-100 rounded-md border border-orange-200">Average</span>;
+        if (val >= 80) return <span className="px-2 py-1 text-xs font-bold text-green-700 bg-green-100 rounded-md border border-green-200">Excellent</span>;
+        if (val >= 60) return <span className="px-2 py-1 text-xs font-bold text-blue-700 bg-blue-100 rounded-md border border-blue-200">Good</span>;
+        if (val >= 50) return <span className="px-2 py-1 text-xs font-bold text-orange-500 bg-orange-100 rounded-md border border-orange-200">Average</span>;
         return <span className="px-2 py-1 text-xs font-bold text-red-700 bg-red-100 rounded-md border border-red-200">Critical</span>;
     };
 
@@ -152,7 +152,7 @@ const FullLeaderboardTable = ({ data }) => {
                                             </div>
                                             <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
                                                 <div
-                                                    className={`h-full rounded-full ${isTop3 ? 'bg-green-500' : percentage < 50 ? 'bg-red-500' : 'bg-indigo-500'}`}
+                                                    className={`h-full rounded-full ${percentage >= 80 ? 'bg-green-500' : percentage >= 60 ? 'bg-blue-500' : percentage >= 50 ? 'bg-orange-500' : 'bg-red-500'}`}
                                                     style={{ width: `${percentage}%` }}
                                                 ></div>
                                             </div>
@@ -160,12 +160,12 @@ const FullLeaderboardTable = ({ data }) => {
                                     </td>
 
                                     <td className="px-6 py-4 text-right">
-                                        <span className={`text-lg font-bold ${percentage < 75 ? 'text-red-600' : 'text-gray-800'}`}>
+                                        <span className={`text-lg font-bold ${percentage >= 80 ? 'text-green-500' : percentage >= 60 ? 'text-blue-500' : percentage >= 50 ? 'text-orange-500' : 'text-red-500'}`}>
                                             {percentage.toFixed(1)}%
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <span className={`text-lg font-bold ${percentage < 75 ? 'text-red-600' : 'text-gray-800'}`}>
+                                        <span className={`text-lg font-bold ${percentage >= 80 ? 'text-green-500' : percentage >= 60 ? 'text-blue-500' : percentage >= 50 ? 'text-orange-500' : 'text-red-500'}`}>
                                             {avgstud}
                                         </span>
                                     </td>

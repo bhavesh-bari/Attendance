@@ -1,10 +1,44 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-
 import * as XLSX from "xlsx-js-style";
 import { saveAs } from "file-saver";
 import { Loader2, Download, Filter, Info } from "lucide-react";
+
+/* ---------------- SKELETON COMPONENTS ---------------- */
+
+const Skeleton = ({ className }) => (
+    <div className={`bg-gray-200 animate-pulse rounded ${className}`} />
+);
+
+const TableSkeleton = () => (
+    <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+                <thead>
+                    <tr className="bg-gray-800 border-b border-gray-700">
+                        <th className="p-4 w-12 border-r border-gray-700"><Skeleton className="h-4 w-4 bg-gray-600" /></th>
+                        <th className="p-4 min-w-[200px] border-r border-gray-700"><Skeleton className="h-4 w-32 bg-gray-600" /></th>
+                        {[1, 2, 3].map(i => (
+                            <th key={i} className="p-4 border-r border-gray-700"><Skeleton className="h-4 w-20 mx-auto bg-gray-600" /></th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                    {[...Array(6)].map((_, idx) => (
+                        <tr key={idx}>
+                            <td className="p-4 border-r"><Skeleton className="h-4 w-4 mx-auto" /></td>
+                            <td className="p-4 border-r"><Skeleton className="h-4 w-40" /></td>
+                            {[...Array(6)].map((_, cidx) => (
+                                <td key={cidx} className="p-4 border-r"><Skeleton className="h-4 w-12 mx-auto" /></td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    </div>
+);
 
 const Cell = ({ value, type }) => {
     const isMissing = value === "-";
@@ -29,9 +63,9 @@ const Cell = ({ value, type }) => {
 export default function AttendanceTable() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [initialFetch, setInitialFetch] = useState(true); // Added for skeleton logic
     const [availableDepts, setAvailableDepts] = useState([]);
 
-    /* ================= FILTER STATE ================= */
     const [department, setDepartment] = useState("ALL");
     const [year, setYear] = useState("ALL");
     const [period, setPeriod] = useState("today");
@@ -43,7 +77,6 @@ export default function AttendanceTable() {
     const isSingleDay = period === "today" || period === "date";
     const shouldShowEvents = isSingleDay && showEvents;
 
-    /* ================= FETCH DATA ================= */
     const fetchData = async () => {
         setLoading(true);
         const params = new URLSearchParams();
@@ -68,6 +101,7 @@ export default function AttendanceTable() {
             console.error("Failed to fetch table data", error);
         } finally {
             setLoading(false);
+            setInitialFetch(false); // Disable skeleton after first load
         }
     };
 
@@ -76,14 +110,10 @@ export default function AttendanceTable() {
         if (!isSingleDay) setShowEvents(false);
     }, []);
 
-
-    /* ================= EXPORT TO EXCEL  ================= */
     const exportExcel = () => {
         if (!data || !data.rows.length) return;
 
-        // --- 1. Define Styles ---
         const styles = {
-            // Main Header (Dark Blue)
             headerMain: {
                 font: { bold: true, color: { rgb: "FFFFFF" }, sz: 12 },
                 fill: { fgColor: { rgb: "1E3A8A" } },
@@ -93,7 +123,6 @@ export default function AttendanceTable() {
                     right: { style: "thin", color: { rgb: "FFFFFF" } }
                 }
             },
-            // Sub Header (Light Blue)
             headerSub: {
                 font: { bold: true, color: { rgb: "1E3A8A" } },
                 fill: { fgColor: { rgb: "DBEAFE" } },
@@ -103,7 +132,6 @@ export default function AttendanceTable() {
                     right: { style: "thin", color: { rgb: "FFFFFF" } }
                 }
             },
-            // Department Column (Left Aligned, Bold)
             cellDept: {
                 font: { bold: true, color: { rgb: "111827" } },
                 alignment: { horizontal: "left", vertical: "center" },
@@ -112,7 +140,6 @@ export default function AttendanceTable() {
                     bottom: { style: "thin", color: { rgb: "E5E7EB" } }
                 }
             },
-            // Count Column (Standard White)
             cellCount: {
                 alignment: { horizontal: "center", vertical: "center" },
                 border: {
@@ -120,7 +147,6 @@ export default function AttendanceTable() {
                     bottom: { style: "thin", color: { rgb: "E5E7EB" } }
                 }
             },
-            // Percentage Column (Light Gray Background)
             cellPercent: {
                 fill: { fgColor: { rgb: "F3F4F6" } },
                 alignment: { horizontal: "center", vertical: "center" },
@@ -129,17 +155,15 @@ export default function AttendanceTable() {
                     bottom: { style: "thin", color: { rgb: "E5E7EB" } }
                 }
             },
-            // Event Column (Light Orange Background)
             cellEvent: {
                 font: { italic: true, color: { rgb: "4B5563" }, sz: 10 },
                 fill: { fgColor: { rgb: "FFF7ED" } },
                 alignment: { horizontal: "center", vertical: "center", wrapText: true },
                 border: {
-                    right: { style: "medium", color: { rgb: "E5E7EB" } }, // Thicker border after group
+                    right: { style: "medium", color: { rgb: "E5E7EB" } },
                     bottom: { style: "thin", color: { rgb: "E5E7EB" } }
                 }
             },
-            // Alert Style (Red for Low Attendance)
             cellLowAttendance: {
                 font: { bold: true, color: { rgb: "DC2626" } },
                 fill: { fgColor: { rgb: "FEE2E2" } },
@@ -148,16 +172,13 @@ export default function AttendanceTable() {
             }
         };
 
-        // --- 2. Build Data Arrays ---
         const headerRow1 = ["Department / Shift"];
         const headerRow2 = [""];
         const merges = [{ s: { r: 0, c: 0 }, e: { r: 1, c: 0 } }];
-
         let colIndex = 1;
 
         data.columns.forEach(col => {
             headerRow1.push(col);
-
             if (shouldShowEvents) {
                 headerRow1.push("", "");
                 headerRow2.push("Count", "%", "Event");
@@ -171,9 +192,7 @@ export default function AttendanceTable() {
             }
         });
 
-        // --- 3. Create Sheet ---
         const wsData = [headerRow1, headerRow2];
-
         data.rows.forEach(row => {
             const rowData = [row.label];
             data.columns.forEach(col => {
@@ -186,8 +205,6 @@ export default function AttendanceTable() {
         });
 
         const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-        // --- 4. Apply Styling Logic ---
         const range = XLSX.utils.decode_range(ws['!ref']);
 
         for (let R = range.s.r; R <= range.e.r; ++R) {
@@ -195,81 +212,49 @@ export default function AttendanceTable() {
                 const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
                 if (!ws[cellRef]) continue;
 
-                // --- HEADERS ---
-                if (R === 0) {
-                    ws[cellRef].s = styles.headerMain;
-                }
-                else if (R === 1) {
-                    ws[cellRef].s = styles.headerSub;
-                }
-                // --- DATA ROWS ---
+                if (R === 0) ws[cellRef].s = styles.headerMain;
+                else if (R === 1) ws[cellRef].s = styles.headerSub;
                 else {
                     const cellVal = ws[cellRef].v;
-
-                    // Column Logic
-                    if (C === 0) {
-                        // Department Column
-                        ws[cellRef].s = styles.cellDept;
-                    } else {
-                        // Data Columns
+                    if (C === 0) ws[cellRef].s = styles.cellDept;
+                    else {
                         const effectiveColIndex = C - 1;
                         const groupSize = shouldShowEvents ? 3 : 2;
                         const mod = effectiveColIndex % groupSize;
-
                         let appliedStyle = {};
 
-                        if (mod === 0) {
-                            // 1. Count Column
-                            appliedStyle = { ...styles.cellCount };
-                        } else if (mod === 1) {
-                            // 2. Percentage Column
-                            // Check for Low Attendance Warning
-                            if (typeof cellVal === 'number' && cellVal < 50) {
-                                appliedStyle = { ...styles.cellLowAttendance };
-                            } else {
-                                appliedStyle = { ...styles.cellPercent };
-                            }
-                        } else if (mod === 2) {
-                            // 3. Event Column
-                            appliedStyle = { ...styles.cellEvent };
+                        if (mod === 0) appliedStyle = { ...styles.cellCount };
+                        else if (mod === 1) {
+                            if (typeof cellVal === 'number' && cellVal < 50) appliedStyle = { ...styles.cellLowAttendance };
+                            else appliedStyle = { ...styles.cellPercent };
                         }
+                        else if (mod === 2) appliedStyle = { ...styles.cellEvent };
 
-                        // Apply a thicker right border to the last column of a group
                         if ((mod === 1 && !shouldShowEvents) || (mod === 2 && shouldShowEvents)) {
-                            appliedStyle.border = {
-                                ...appliedStyle.border,
-                                right: { style: "medium", color: { rgb: "D1D5DB" } } // Thicker Grey Separator
-                            };
+                            appliedStyle.border = { ...appliedStyle.border, right: { style: "medium", color: { rgb: "D1D5DB" } } };
                         }
-
                         ws[cellRef].s = appliedStyle;
                     }
                 }
             }
         }
 
-        // --- 5. Finalize Layout ---
         ws['!merges'] = merges;
-
-        const wscols = [{ wch: 35 }]; // Wide Dept Column
+        const wscols = [{ wch: 35 }];
         data.columns.forEach(() => {
-            if (shouldShowEvents) {
-                wscols.push({ wch: 8 }, { wch: 8 }, { wch: 25 });
-            } else {
-                wscols.push({ wch: 8 }, { wch: 8 });
-            }
+            if (shouldShowEvents) wscols.push({ wch: 8 }, { wch: 8 }, { wch: 25 });
+            else wscols.push({ wch: 8 }, { wch: 8 });
         });
         ws['!cols'] = wscols;
 
-        // --- 6. Save ---
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Attendance Report");
         const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
         saveAs(new Blob([buf]), `Attendance_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
-    /* ================= RENDER ================= */
+
     return (
-        <div className="p-6 bg-gray-50 min-h-screen md:ml-20">
+        <div className="p-6 bg-gray-50 min-h-screen md:ml-20 font-sans">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-800 tracking-tight">
@@ -282,20 +267,18 @@ export default function AttendanceTable() {
             {/* Filter Toolbar */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
                 <div className="flex flex-wrap items-end gap-4">
-                    {/* Dept */}
                     <div className="flex flex-col gap-1.5">
                         <label className="text-xs font-semibold text-gray-500 uppercase">Department</label>
-                        <select className="border border-gray-300 bg-white p-2 rounded-lg text-sm min-w-[150px]"
+                        <select className="border border-gray-300 bg-white p-2 rounded-lg text-sm min-w-[150px] outline-none focus:ring-2 focus:ring-blue-500"
                             value={department} onChange={e => setDepartment(e.target.value)}>
                             <option value="ALL">All Departments</option>
                             {availableDepts.map(dept => <option key={dept} value={dept}>{dept}</option>)}
                         </select>
                     </div>
 
-                    {/* Year */}
                     <div className="flex flex-col gap-1.5">
                         <label className="text-xs font-semibold text-gray-500 uppercase">Year</label>
-                        <select className="border border-gray-300 bg-white p-2 rounded-lg text-sm min-w-[100px]"
+                        <select className="border border-gray-300 bg-white p-2 rounded-lg text-sm min-w-[100px] outline-none focus:ring-2 focus:ring-blue-500"
                             value={year} onChange={e => setYear(e.target.value)}>
                             <option value="ALL">All Years</option>
                             <option value="FE">FE</option>
@@ -305,10 +288,9 @@ export default function AttendanceTable() {
                         </select>
                     </div>
 
-                    {/* Period */}
                     <div className="flex flex-col gap-1.5">
                         <label className="text-xs font-semibold text-gray-500 uppercase">Time Period</label>
-                        <select className="border border-gray-300 bg-white p-2 rounded-lg text-sm min-w-[150px]"
+                        <select className="border border-gray-300 bg-white p-2 rounded-lg text-sm min-w-[150px] outline-none focus:ring-2 focus:ring-blue-500"
                             value={period} onChange={e => {
                                 setPeriod(e.target.value);
                                 if (e.target.value !== 'today' && e.target.value !== 'date') setShowEvents(false);
@@ -321,11 +303,10 @@ export default function AttendanceTable() {
                         </select>
                     </div>
 
-                    {/* Conditional Date Inputs */}
                     {period === "date" && (
                         <div className="flex flex-col gap-1.5">
                             <label className="text-xs font-semibold text-gray-500 uppercase">Select Date</label>
-                            <input type="date" className="border border-gray-300 p-2 rounded-lg text-sm"
+                            <input type="date" className="border border-gray-300 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
                                 value={date} onChange={e => setDate(e.target.value)} />
                         </div>
                     )}
@@ -333,18 +314,17 @@ export default function AttendanceTable() {
                         <>
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-xs font-semibold text-gray-500 uppercase">From</label>
-                                <input type="date" className="border border-gray-300 p-2 rounded-lg text-sm"
+                                <input type="date" className="border border-gray-300 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
                                     value={from} onChange={e => setFrom(e.target.value)} />
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-xs font-semibold text-gray-500 uppercase">To</label>
-                                <input type="date" className="border border-gray-300 p-2 rounded-lg text-sm"
+                                <input type="date" className="border border-gray-300 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
                                     value={to} onChange={e => setTo(e.target.value)} />
                             </div>
                         </>
                     )}
 
-                    {/* Show Events Radio */}
                     {isSingleDay && (
                         <div className="flex flex-col gap-1.5">
                             <label className="text-xs font-semibold text-gray-500 uppercase">Show Event Name</label>
@@ -361,30 +341,31 @@ export default function AttendanceTable() {
                         </div>
                     )}
 
-                    {/* Buttons */}
                     <div className="flex items-center gap-2 ml-auto">
-                        <button onClick={fetchData} disabled={loading} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                        <button onClick={fetchData} disabled={loading} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 min-w-[100px] justify-center">
                             {loading ? <Loader2 className="animate-spin" size={16} /> : <Filter size={16} />} Apply
                         </button>
-                        <button onClick={exportExcel} disabled={!data} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                        <button onClick={exportExcel} disabled={!data || loading} className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
                             <Download size={16} /> Export Excel
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* Table */}
-            {loading ? (
-                <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-                    <Loader2 size={32} className="animate-spin mb-2" />
-                    <p>Loading records...</p>
-                </div>
+            {/* Table Area */}
+            {initialFetch ? (
+                <TableSkeleton />
             ) : !data || data.rows.length === 0 ? (
                 <div className="bg-white p-12 text-center rounded-xl border border-gray-200 text-gray-500 shadow-sm">
-                    No data found.
+                    {loading ? (
+                        <div className="flex flex-col items-center gap-2">
+                            <Loader2 size={32} className="animate-spin text-blue-500" />
+                            <p>Refreshing data...</p>
+                        </div>
+                    ) : "No data found."}
                 </div>
             ) : (
-                <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden hide-scrollbar">
+                <div className={`bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden transition-opacity duration-300 ${loading ? 'opacity-50' : 'opacity-100'}`}>
                     <div className="overflow-x-auto custom-scrollbar hide-scrollbar">
                         <table className="w-full border-collapse">
                             <thead>
@@ -428,7 +409,7 @@ export default function AttendanceTable() {
                 </div>
             )}
 
-            <div className="mt-4 flex items-start gap-2 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+            <div className="mt-4 flex items-start gap-2 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 shadow-sm">
                 <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
                 <p><span className="font-semibold">Note:</span> For <b>Month</b>, <b>Overall</b>, and <b>Date Range</b>, the <b>Present Count</b> represents an <b>average per day</b>.</p>
             </div>

@@ -12,30 +12,67 @@ import DashAttendanceBar from "@/components/UI/dashAttendanceBar";
 import DashEvents from "@/components/UI/dashEvents";
 import Leaderboard from "@/components/UI/Leaderboard";
 
+/* ================= SKELETON COMPONENTS ================= */
+// Mimics your exact UI structure with a pulse effect
+const Skeleton = ({ className }) => (
+    <div className={`bg-gray-200 animate-pulse rounded-md ${className}`} />
+);
+
+const DashboardSkeleton = () => (
+    <div className="md:ml-16 space-y-8 bg-gray-50/50 min-h-screen p-6 pb-20">
+        {/* Summary Skeleton - Mimics SummaryCards box */}
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="p-4 border rounded-lg bg-indigo-50/30 flex flex-col items-center gap-2">
+                        <Skeleton className="h-8 w-16" />
+                        <Skeleton className="h-3 w-24" />
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        {/* Filter Skeleton - Mimics Filter Bar */}
+        <div className="bg-white p-4 rounded-xl shadow-md border border-gray-100 flex flex-col md:flex-row justify-between gap-4">
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-10 w-full md:w-1/2 rounded-lg" />
+            <Skeleton className="h-8 w-24" />
+        </div>
+
+        {/* Main Charts Skeleton */}
+        <div className="space-y-8">
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 h-[350px]">
+                <Skeleton className="h-full w-full rounded-lg" />
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 h-[300px]">
+                <Skeleton className="h-full w-full rounded-lg" />
+            </div>
+        </div>
+    </div>
+);
+
 const DashboardPage = () => {
-    // --- 1. Data State (Charts & Tables) ---
+    // --- 1. Data State ---
     const [chartData, setChartData] = useState({
         departmentAttendance: [],
         eventCounts: [],
         leaderboard: []
     });
-
-    // --- 2. Data State (Summary Cards) ---
     const [summaryData, setSummaryData] = useState(null);
 
-    // --- 3. Loading & UI State ---
-    const [loading, setLoading] = useState(true);
+    // --- 2. Loading & UI State ---
+    const [loading, setLoading] = useState(true); // Changed: Initial load state
     const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // --- 4. Filter State (Affects Charts Only) ---
-    const [filterType, setFilterType] = useState("today"); // Default: today
+    // --- 3. Filter State ---
+    const [filterType, setFilterType] = useState("today");
     const [customDate, setCustomDate] = useState(new Date().toISOString().split('T')[0]);
     const [dateRange, setDateRange] = useState({
         start: new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0],
         end: new Date().toISOString().split('T')[0]
     });
 
-    // --- Fetch: Summary Data (Runs Once on Mount) ---
+    // --- Fetch: Summary Data ---
     useEffect(() => {
         const fetchSummary = async () => {
             try {
@@ -48,16 +85,14 @@ const DashboardPage = () => {
                 console.error("Summary fetch failed", err);
             }
         };
-
         fetchSummary();
     }, []);
 
-    // --- Fetch: Chart Data (Runs on Filter Change) ---
+    // --- Fetch: Chart Data ---
     useEffect(() => {
         const fetchCharts = async () => {
             setIsRefreshing(true);
             try {
-                // Build dynamic query string for charts
                 const params = new URLSearchParams();
                 params.append('filter', filterType);
 
@@ -77,12 +112,11 @@ const DashboardPage = () => {
             } catch (err) {
                 console.error("Chart fetch failed", err);
             } finally {
-                setLoading(false);
-                setIsRefreshing(false);
+                setLoading(false); // Stop showing skeleton
+                setIsRefreshing(false); // Stop showing refresh spinner in filter bar
             }
         };
 
-        // Debounce to prevent rapid API calls while typing/selecting dates
         const timeoutId = setTimeout(() => {
             fetchCharts();
         }, 300);
@@ -90,30 +124,24 @@ const DashboardPage = () => {
         return () => clearTimeout(timeoutId);
     }, [filterType, customDate, dateRange]);
 
-    if (loading && !summaryData) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-50 text-indigo-600">
-                <div className="flex flex-col items-center gap-2">
-                    <RefreshCw className="animate-spin w-8 h-8" />
-                    <span className="text-sm font-medium">Loading Dashboard...</span>
-                </div>
-            </div>
-        );
+    
+    if (loading) {
+        return <DashboardSkeleton />;
     }
 
     return (
-        <div className="md:ml-16 space-y-8 bg-gray-50/50 min-h-screen p-6 pb-20">
+        <div className="md:ml-16 space-y-8 bg-gray-50/50 min-h-screen p-6 pb-20 animate-in fade-in duration-500">
 
-            {/* 1. Summary Cards Section (Data from /overview) */}
+            {/* 1. Summary Cards Section */}
             <div className="bg-white p-1 rounded-xl shadow-lg border border-gray-100">
                 {summaryData ? (
                     <SummaryCards dashboard={summaryData} />
                 ) : (
-                    <div className="p-8 text-center text-gray-400">Loading Summaries...</div>
+                    <div className="p-8"><Skeleton className="h-20 w-full" /></div>
                 )}
             </div>
 
-            {/* 2. Filter UI (Controls Charts Below) */}
+            {/* 2. Filter UI */}
             <div className="bg-white p-4 rounded-xl shadow-md border border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all">
 
                 {/* Left: Filter Label & Icon */}
@@ -189,8 +217,9 @@ const DashboardPage = () => {
                 </div>
             </div>
 
-            {/* 3. Charts & Analytics Section (Data from /filter) */}
-            <div className={`space-y-8 transition-opacity duration-300 ${isRefreshing ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+            {/* 3. Charts & Analytics Section */}
+            {/* Added a stable layout transition for filter updates */}
+            <div className={`space-y-8 transition-opacity duration-300 ${isRefreshing ? 'opacity-50' : 'opacity-100'}`}>
 
                 <div className="bg-white p-1 rounded-xl shadow-lg border border-gray-100">
                     <DashAttendanceBar data={chartData.departmentAttendance} />
