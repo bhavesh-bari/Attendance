@@ -1,0 +1,19 @@
+User-agent: *
+
+# ❌ Block all private login-required pages
+Disallow: /dashboard
+Disallow: /dashboard/
+Disallow: /attendances
+Disallow: /attendances/
+Disallow: /classes
+Disallow: /classes/
+Disallow: /table
+Disallow: /table/
+Disallow: /analytics
+Disallow: /analytics/
+
+# ✔ Allow homepage & login page
+Allow: /
+Allow: /auth
+
+Sitemap: https://jspmattendance.vercel.app/sitemap.xml

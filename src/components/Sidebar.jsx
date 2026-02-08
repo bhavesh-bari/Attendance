@@ -20,14 +20,14 @@ const DURATION = "duration-300";
 const navItemsByRole = {
   AMC: [
     { name: "Dashboard", href: "/dashboard", icon: Home },
-    { name: "Attendance Fill", href: "/fill", icon: BookOpen },
-    { name: "Classes Management", href: "/edit", icon: Users },
+    { name: "Attendance Fill", href: "/attendances", icon: BookOpen },
+    { name: "Classes Management", href: "/classes", icon: Users },
     { name: "Table", href: "/table", icon: Table },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
   ],
   "Department Dean": [
     { name: "Dashboard", href: "/dashboard", icon: Home },
-    { name: "Attendance Fill", href: "/fill", icon: BookOpen },
+    { name: "Attendance Fill", href: "/attendances", icon: BookOpen },
     { name: "Table", href: "/table", icon: Table },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
   ],

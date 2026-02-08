@@ -22,10 +22,10 @@ const ClassSchema = new mongoose.Schema(
 );
 
 
-ClassSchema.index(
-  { name: 1, academicYear: 1 },
-  { unique: true }
-);
+ClassSchema.index({ academicYear: 1, name: 1 }, { unique: true });
+ClassSchema.index({ academicYear: 1, department: 1 });
+ClassSchema.index({ academicYear: 1, year: 1 });
+ClassSchema.index({ academicYear: 1, department: 1, year: 1 });
 
 export default mongoose.models.Class ||
   mongoose.model("Class", ClassSchema);

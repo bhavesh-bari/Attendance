@@ -8,11 +8,11 @@ export default withAuth({
             const role = token.role;
             const path = req.nextUrl.pathname;
 
-            if (path.startsWith("/edit")) {
+            if (path.startsWith("/classes")) {
                 return role === "AMC";
             }
 
-            if (path.startsWith("/fill")) {
+            if (path.startsWith("/attendances")) {
                 return role === "AMC" || role === "Department Dean";
             }
 
@@ -28,8 +28,8 @@ export const config = {
     matcher: [
         "/",
         "/dashboard/:path*",
-        "/fill/:path*",
-        "/edit/:path*",
+        "/attendances/:path*",
+        "/classes/:path*",
         "/table/:path*",
         "/analytics/:path*",
     ],
