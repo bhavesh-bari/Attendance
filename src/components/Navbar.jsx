@@ -44,7 +44,7 @@ const Navbar = ({ isSidebarOpen, toggleSidebar }) => {
         {/* College Branding - Hidden on tiny screens, simplified on mobile */}
         <div className="md:flex md:flex-col hidden">
           <h1 className="text-sm  text-cyan-500 md:text-lg leading-tight truncate max-w-[150px] md:max-w-none">
-            {session?.user?.role || "Admin"} Dashboard
+            {session?.user?.role || "Faculty"} Dashboard
           </h1>
           <p className="text-[10px] text-gray-500 font-medium md:hidden">
             JSPM Narhe

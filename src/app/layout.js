@@ -47,7 +47,7 @@ export const metadata = {
     siteName: "JSPM NTC Attendance Monitoring System",
     images: [
       {
-        url: `${domain}/og-image.png`, // Upload later
+        url: `${domain}/og-image.png`,
         width: 1200,
         height: 630,
         alt: "JSPM NTC Attendance System",
