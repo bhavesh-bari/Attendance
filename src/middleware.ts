@@ -5,15 +5,6 @@ export default withAuth({
         authorized: ({ token, req }) => {
             const path = req.nextUrl.pathname;
 
-            const publicFiles = [
-                "/og-image.png",
-                "/sitemap.xml",
-                "/robots.txt",
-                "/favicon.ico"
-            ];
-
-            if (publicFiles.includes(path)) return true;
-
             if (!token) return false;
 
             const role = token.role || "Faculty";
@@ -41,14 +32,11 @@ export default withAuth({
 // =========================
 export const config = {
     matcher: [
-        "/((?!_next|static|public|.*\\.(png|jpg|jpeg|svg|webp|gif|ico)).*)",
-
         "/dashboard/:path*",
         "/attendances/:path*",
         "/classes/:path*",
         "/table/:path*",
         "/analytics/:path*",
-
         "/api/:path*",
     ],
 };
