@@ -29,48 +29,57 @@ export async function GET(req) {
     const academicYear = getAcademicYear();
     const alldepartments = await Class.distinct("department");
 
-    /* =============== DATE FILTER ================= */
     let startDate = null;
     let endDate = null;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+
+    // 🟢 FIXED DATE HANDLING (LOCAL MIDNIGHT)
+    const makeDayStart = d => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+    const makeDayEnd = d => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
 
     switch (period) {
-        case "today":
-            startDate = today;
-            endDate = today;
+        case "today": {
+            const d = new Date();
+            startDate = makeDayStart(d);
+            endDate = makeDayEnd(d);
             break;
+        }
 
-        case "month":
-            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-            endDate = today;
+        case "month": {
+            const first = new Date(now.getFullYear(), now.getMonth(), 1);
+            startDate = makeDayStart(first);
+            endDate = makeDayEnd(now);
             break;
+        }
 
-        case "date":
+        case "date": {
             if (dateParam) {
-                startDate = new Date(dateParam);
-                endDate = new Date(dateParam);
+                const d = new Date(dateParam);
+                startDate = makeDayStart(d);
+                endDate = makeDayEnd(d);
             }
             break;
+        }
 
-        case "range":
+        case "range": {
             if (fromParam && toParam) {
-                startDate = new Date(fromParam);
-                endDate = new Date(toParam);
+                const f = new Date(fromParam);
+                const t = new Date(toParam);
+                startDate = makeDayStart(f);
+                endDate = makeDayEnd(t);
             }
             break;
+        }
     }
 
-    if (startDate) startDate.setHours(0, 0, 0, 0);
-    if (endDate) endDate.setHours(23, 59, 59, 999);
+
 
     const dateQuery =
         startDate && endDate
             ? { date: { $gte: startDate, $lte: endDate }, academicYear }
             : { academicYear };
 
-    /* =============== LOAD DATA ================= */
     const classQuery = { academicYear };
 
     if (departmentFilter !== "ALL") classQuery.department = departmentFilter;
@@ -79,7 +88,6 @@ export async function GET(req) {
     const classes = await Class.find(classQuery).lean();
     const attendance = await Attendance.find(dateQuery).lean();
 
-    /* =============== COLUMNS ================= */
     const columns = [...new Set(
         classes.map(c => `${YEAR_MAP[c.year]}-${c.division}`)
     )].sort((a, b) => {
@@ -89,15 +97,11 @@ export async function GET(req) {
         return order.indexOf(ya) - order.indexOf(yb) || da.localeCompare(db);
     });
 
-    /* =============== HELPER FUNCTIONS ================= */
-
-    // Average daily logic
     const calcCell = (records, session, includeEvents) => {
         if (!records.length) {
             return includeEvents ? { P: "-", "%": "-", eventName: "" } : { P: "-", "%": "-" };
         }
 
-        // Group records by day
         const dayMap = {};
 
         for (const r of records) {
@@ -151,10 +155,8 @@ export async function GET(req) {
     const isMultiDay = ["month", "overall", "range"].includes(period);
     const includeEvents = ["today", "date"].includes(period);
 
-    /* =============== ROWS ================= */
     const departments = [...new Set(classes.map(c => c.department))];
     const sessions = ["morning", "afternoon"];
-
     const rows = [];
 
     for (const dept of departments) {

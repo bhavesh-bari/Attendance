@@ -33,8 +33,13 @@ export async function POST(req) {
             );
         }
 
-        const normalizedDate = new Date(date);
-        normalizedDate.setHours(0, 0, 0, 0);
+        const d = new Date(date);
+        const normalizedDate = new Date(
+            d.getFullYear(),
+            d.getMonth(),
+            d.getDate(),
+            0, 0, 0, 0
+        );
 
         const academicYear = getAcademicYear(normalizedDate);
         const isEvent = Boolean(MEventName || AEventName);
