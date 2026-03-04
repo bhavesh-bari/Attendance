@@ -59,17 +59,16 @@ export async function GET(req) {
       }
     }
 
-    const dateQuery =
-      startDate && endDate
+    const attendanceQuery = {
+      academicYear,                        
+      ...(startDate && endDate
         ? { date: { $gte: startDate, $lte: endDate } }
-        : {};
+        : {}),
+    };
 
-    /* =======================
-       FETCH DATA (ACADEMIC SAFE)
-    ======================= */
     const [attendance, classes] = await Promise.all([
-      Attendance.find(dateQuery),
-      Class.find({ academicYear })
+      Attendance.find(attendanceQuery).lean(),  
+      Class.find({ academicYear }).lean(),       
     ]);
 
     const classMap = {};

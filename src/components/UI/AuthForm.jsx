@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Spline from "@splinetool/react-spline";
@@ -14,7 +15,7 @@ import {
   EyeOff,
   Loader2,
   LogIn,
-  Building, 
+  Building,
 } from "lucide-react";
 
 export default function AuthForm() {
@@ -31,7 +32,7 @@ export default function AuthForm() {
     role: "",
     department: "",
   });
-
+  const [departments, setDepartments] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -59,7 +60,7 @@ export default function AuthForm() {
 
     try {
       if (isLogin) {
-        
+
         const res = await signIn("credentials", {
           email: formData.email,
           password: formData.password,
@@ -99,7 +100,24 @@ export default function AuthForm() {
       setIsLoading(false);
     }
   };
+  useEffect(() => {
+    if (!isLogin) {
+      fetchDepartments();
+    }
+  }, [isLogin]);
 
+  const fetchDepartments = async () => {
+    try {
+      const res = await fetch("/api/getdepartment");
+      const data = await res.json();
+      console
+      if (data.success) {
+        setDepartments(data.departments);
+      }
+    } catch (err) {
+      console.error("Department fetch error:", err);
+    }
+  };
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="flex bg-white rounded-2xl shadow-2xl overflow-hidden w-full max-w-4xl min-h-[600px] transition-all duration-500">
@@ -137,7 +155,7 @@ export default function AuthForm() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-         
+
             {!isLogin && (
               <>
                 {/* Role Selection */}
@@ -172,14 +190,24 @@ export default function AuthForm() {
                 {/* Department Input (Added to match Logic) */}
                 <div className="relative">
                   <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                  <input
-                    type="text"
+
+                  <select
                     name="department"
-                    placeholder="Department (e.g. CSE)"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder-gray-400 text-gray-800"
+                    required
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 
+               rounded-xl focus:outline-none focus:ring-2
+               focus:ring-blue-500 text-gray-700 appearance-none transition-all"
                     onChange={handleChange}
                     value={formData.department}
-                  />
+                  >
+                    <option value="">Select Department</option>
+
+                    {departments.map((d, index) => (
+                      <option key={index} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </>
             )}

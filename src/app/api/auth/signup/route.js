@@ -8,7 +8,16 @@ export async function POST(req) {
     await connectDB();
 
     if (role === "AMC") {
-        return new Response("AMC cannot be created via signup", { status: 403 });
+        const existingamc = await User.findOne({
+            role: "AMC"
+        });
+
+        if (existingamc) {
+            return new Response(
+                "AMC Admin already exists",
+                { status: 409 }
+            );
+        }
     }
 
     if (role === "Department Dean") {

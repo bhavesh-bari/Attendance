@@ -250,7 +250,48 @@ export default function AttendanceTable() {
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Attendance Report");
         const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
-        saveAs(new Blob([buf]), `Attendance_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+        // ------------------ FILENAME BUILDER ------------------ //
+        let fileName = "Attendance_Report";
+
+        if (period === "today") {
+            const today = new Date().toISOString().split("T")[0];
+            fileName = `Attendance_${today}`;
+        }
+
+        if (period === "date" && date) {
+            fileName = `Attendance_${date}`;
+        }
+
+        if (period === "range" && from && to) {
+            fileName = `Attendance_${from}_to_${to}`;
+        }
+
+        if (period === "month") {
+            const now = new Date();
+            const month = now.getMonth() + 1;
+            const year = now.getFullYear();
+            fileName = `Attendance_${month}-${year}`;
+        }
+
+        if (period === "overall") {
+            fileName = `Attendance_Overall_${new Date().getFullYear()}`;
+        }
+
+        // Add department for more clarity (optional)
+        if (department !== "ALL") {
+            fileName += `_Dept-${department}`;
+        }
+
+        // Add year filter (optional)
+        if (year !== "ALL") {
+            fileName += `_Year-${year}`;
+        }
+
+        fileName += ".xlsx";
+
+
+        saveAs(new Blob([buf]), fileName);
+
     };
 
     return (

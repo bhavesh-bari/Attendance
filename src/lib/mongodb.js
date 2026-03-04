@@ -1,13 +1,40 @@
 import mongoose from "mongoose";
 
+const MONGO_URI = process.env.MONGO_URI;
+
+if (!MONGO_URI) {
+  throw new Error("Please define the MONGO_URI environment variable inside .env.local");
+}
+
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
 export async function connectDB() {
-  if (mongoose.connection.readyState === 1) {
-    return mongoose.connection.asPromise();
+  if (cached.conn) {
+    return cached.conn;
   }
 
-  const uri = process.env.MONGO_URI;
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(MONGO_URI, {
+      bufferCommands: false,
+      maxPoolSize: 5,
+      minPoolSize: 1,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 30000,
+    }).then((mongoose) => {
+      return mongoose;
+    });
+  }
 
-  if (!uri) throw new Error("Please add MONGO_URI to .env.local");
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    throw e;
+  }
 
-  return mongoose.connect(uri);
+  return cached.conn;
 }

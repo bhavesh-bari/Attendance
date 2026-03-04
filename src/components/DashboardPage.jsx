@@ -124,7 +124,7 @@ const DashboardPage = () => {
         return () => clearTimeout(timeoutId);
     }, [filterType, customDate, dateRange]);
 
-    
+
     if (loading) {
         return <DashboardSkeleton />;
     }
@@ -222,7 +222,12 @@ const DashboardPage = () => {
             <div className={`space-y-8 transition-opacity duration-300 ${isRefreshing ? 'opacity-50' : 'opacity-100'}`}>
 
                 <div className="bg-white p-1 rounded-xl shadow-lg border border-gray-100">
-                    <DashAttendanceBar data={chartData.departmentAttendance} />
+                    <DashAttendanceBar
+                        data={chartData.departmentAttendance}
+                        filterType={filterType}
+                        customDate={customDate}
+                        dateRange={{ start: dateRange.start, end: dateRange.end }}
+                    />
                 </div>
 
                 <div className="bg-white p-1 rounded-xl shadow-lg border border-gray-100">

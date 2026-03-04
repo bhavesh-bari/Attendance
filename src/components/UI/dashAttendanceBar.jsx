@@ -52,11 +52,44 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-export default function DepartmentBarChart({ data = [] }) {
+export default function DepartmentBarChart({ data = [] ,
+        filterType = "overall",
+    customDate = null,
+    dateRange = { start: null, end: null }
+}) {
     const scrollContainerRef = useRef(null);
     const chartContentRef = useRef(null);
     const [isDownloading, setIsDownloading] = useState(false);
+    function buildPDFFileName(filterType, customDate, dateRange) {
+        let name = "Attendance_Chart";
 
+        if (filterType === "today") {
+            const today = new Date().toISOString().split("T")[0];
+            name = `Attendance_${today}`;
+        }
+
+        if (filterType === "thisMonth") {
+            const now = new Date();
+            const month = now.getMonth() + 1;
+            const year = now.getFullYear();
+            name = `Attendance_${month}-${year}`;
+        }
+
+        if (filterType === "overall") {
+            const year = new Date().getFullYear();
+            name = `Attendance_Overall_${year}`;
+        }
+
+        if (filterType === "date") {
+            name = `Attendance_${customDate}`;
+        }
+
+        if (filterType === "range") {
+            name = `Attendance_${dateRange.start}_to_${dateRange.end}`;
+        }
+
+        return name + ".pdf";
+    }
     const formattedData = data.map(item => ({
         name: item.className,
         department: item.department || "Unknown",
@@ -145,8 +178,13 @@ export default function DepartmentBarChart({ data = [] }) {
             // Center the image
             const xPos = (pageWidth - finalWidth) / 2;
             pdf.addImage(imgData, 'PNG', xPos, margin + 15, finalWidth, finalHeight);
+            const fileName = buildPDFFileName(
+                filterType,
+                customDate,
+                dateRange
+            );
 
-            pdf.save("attendance_chart.pdf");
+            pdf.save(fileName);
 
         } catch (error) {
             console.error("PDF Export failed", error);
