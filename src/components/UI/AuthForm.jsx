@@ -169,6 +169,7 @@ export default function AuthForm() {
                     value={formData.role}
                   >
                     <option value="">Select Role</option>
+                    <option value="AMC">AMC</option>
                     <option value="Faculty">Faculty</option>
                     <option value="Department Dean">Department Dean</option>
                   </select>

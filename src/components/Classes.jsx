@@ -451,9 +451,20 @@ const DepartmentCRUDComponent = () => {
                                                         <p className="text-slate-500 font-medium">Division {record.division}</p>
                                                     </div>
                                                 </div>
-                                                <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => handleEditStart(record)} className="text-xs font-medium text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors">Edit</button>
-                                                    <button onClick={() => handleDeleteRecord(record._id)} className="text-xs font-medium text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors">Remove</button>
+                                                <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end gap-2">
+                                                    <button
+                                                        onClick={() => handleEditStart(record)}
+                                                        className="text-xs font-medium text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors"
+                                                    >
+                                                        Edit
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => handleDeleteRecord(record._id)}
+                                                        className="text-xs font-medium text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
+                                                    >
+                                                        Remove
+                                                    </button>
                                                 </div>
                                             </div>
                                         )}
