@@ -36,7 +36,6 @@ export const config = {
         "/attendances/:path*",
         "/classes/:path*",
         "/table/:path*",
-        "/analytics/:path*",
-        "/api/:path*",
+        "/analytics/:path*"
     ],
 };
