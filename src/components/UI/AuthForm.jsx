@@ -32,17 +32,37 @@ export default function AuthForm() {
     role: "",
     department: "",
   });
+
   const [departments, setDepartments] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+
+    if (name === "role") {
+      if (value === "AMC") {
+        setFormData({
+          ...formData,
+          role: value,
+          department: "ALL",
+        });
+        return;
+      } else {
+        setFormData({
+          ...formData,
+          role: value,
+          department: "",
+        });
+        return;
+      }
+    }
+
+    setFormData({ ...formData, [name]: value });
   };
 
   const toggleMode = () => {
     setMode(isLogin ? "signup" : "login");
-    // Reset form
     setFormData({
       username: "",
       email: "",
@@ -53,7 +73,6 @@ export default function AuthForm() {
     setShowPassword(false);
   };
 
-  // Backend Logic (From Logic Code)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -72,8 +91,9 @@ export default function AuthForm() {
         } else {
           router.push("/dashboard");
         }
+
       } else {
-        // ✅ SIGNUP (API)
+
         const res = await fetch("/api/auth/signup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -82,7 +102,7 @@ export default function AuthForm() {
             email: formData.email,
             password: formData.password,
             role: formData.role,
-            department: formData.department,
+            department: formData.role === "AMC" ? "ALL" : formData.department,
           }),
         });
 
@@ -100,6 +120,7 @@ export default function AuthForm() {
       setIsLoading(false);
     }
   };
+
   useEffect(() => {
     if (!isLogin) {
       fetchDepartments();
@@ -110,7 +131,7 @@ export default function AuthForm() {
     try {
       const res = await fetch("/api/getdepartment");
       const data = await res.json();
-      console
+
       if (data.success) {
         setDepartments(data.departments);
       }
@@ -118,14 +139,14 @@ export default function AuthForm() {
       console.error("Department fetch error:", err);
     }
   };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="flex bg-white rounded-2xl shadow-2xl overflow-hidden w-full max-w-4xl min-h-[600px] transition-all duration-500">
 
-        {/* LEFT SECTION: FORM */}
+        {/* LEFT SECTION */}
         <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center relative">
 
-          {/* Branding */}
           <div className="mb-8 text-center md:text-left">
             <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
               <img
@@ -158,7 +179,7 @@ export default function AuthForm() {
 
             {!isLogin && (
               <>
-                {/* Role Selection */}
+                {/* Role */}
                 <div className="relative">
                   <ShieldCheck className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                   <select
@@ -175,7 +196,7 @@ export default function AuthForm() {
                   </select>
                 </div>
 
-                {/* Username Input */}
+                {/* Username */}
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                   <input
@@ -188,32 +209,32 @@ export default function AuthForm() {
                   />
                 </div>
 
-                {/* Department Input (Added to match Logic) */}
-                <div className="relative">
-                  <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                {/* Department (Hidden if AMC) */}
+                {formData.role !== "AMC" && (
+                  <div className="relative">
+                    <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
 
-                  <select
-                    name="department"
-                    required
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 
-               rounded-xl focus:outline-none focus:ring-2
-               focus:ring-blue-500 text-gray-700 appearance-none transition-all"
-                    onChange={handleChange}
-                    value={formData.department}
-                  >
-                    <option value="">Select Department</option>
+                    <select
+                      name="department"
+                      required
+                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700 appearance-none transition-all"
+                      onChange={handleChange}
+                      value={formData.department}
+                    >
+                      <option value="">Select Department</option>
 
-                    {departments.map((d, index) => (
-                      <option key={index} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                      {departments.map((d, index) => (
+                        <option key={index} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </>
             )}
 
-            {/* EMAIL (Both Modes) */}
+            {/* Email */}
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <input
@@ -227,7 +248,7 @@ export default function AuthForm() {
               />
             </div>
 
-            {/* PASSWORD (Both Modes) */}
+            {/* Password */}
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <input
@@ -242,25 +263,20 @@ export default function AuthForm() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
 
-            {/* Forgot Password Link (Login Only) */}
             {isLogin && (
               <div className="flex justify-end">
-                <a
-                  href="#"
-                  className="text-sm text-blue-600 hover:underline font-medium"
-                >
+                <a className="text-sm text-blue-600 hover:underline font-medium">
                   Forgot Password?
                 </a>
               </div>
             )}
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading}
@@ -268,38 +284,33 @@ export default function AuthForm() {
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="animate-spin h-5 w-5" />{" "}
+                  <Loader2 className="animate-spin h-5 w-5" />
                   {isLogin ? "Signing In..." : "Creating Account..."}
                 </>
               ) : (
                 <>
                   {isLogin ? "Sign In" : "Sign Up"}
-                  {isLogin ? (
-                    <LogIn className="h-5 w-5" />
-                  ) : (
-                    <ArrowRight className="h-5 w-5" />
-                  )}
+                  {isLogin ? <LogIn className="h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
                 </>
               )}
             </button>
           </form>
 
-          {/* Toggle Mode */}
           <div className="mt-8 text-center text-sm text-gray-500">
             {isLogin ? "Don't have an account? " : "Already have an account? "}
             <button
               onClick={toggleMode}
-              className="text-blue-600 font-semibold hover:underline focus:outline-none"
+              className="text-blue-600 font-semibold hover:underline"
             >
               {isLogin ? "Sign Up" : "Log In"}
             </button>
           </div>
         </div>
 
-        {/* RIGHT SECTION: VISUALS */}
+        {/* RIGHT SECTION */}
         <div className="hidden md:flex w-1/2 bg-gray-900 relative items-center justify-center overflow-hidden">
-          {/* Decorative background circle */}
-          <div className="absolute top-[-20%] right-[-20%] w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="absolute top-[-20%] right-[-20%] w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-3xl"></div>
 
           <div className="w-full h-[365px] relative z-10">
             <Spline
@@ -316,6 +327,7 @@ export default function AuthForm() {
               Real-time attendance tracking for the modern campus.
             </p>
           </div>
+
         </div>
       </div>
     </div>
